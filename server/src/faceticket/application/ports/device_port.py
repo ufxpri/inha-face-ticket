@@ -1,0 +1,26 @@
+"""운영자 시리얼 장치 포트.
+
+두 구현체 (IssuanceDevice / EntryDevice) 가 동일 시그니처를 만족 — LSP. 어느 쪽이
+연결돼 있든 FlowController 입장에선 동일한 메서드를 호출한다.
+"""
+from __future__ import annotations
+
+from typing import Literal, Optional, Protocol, runtime_checkable
+
+OperatorDeviceKey = Literal["issuance", "entry"]
+
+
+@runtime_checkable
+class IOperatorDevice(Protocol):
+    @property
+    def is_connected(self) -> bool: ...
+    @property
+    def port(self) -> Optional[str]: ...
+
+    async def connect(self, port: str) -> bool: ...
+    def disconnect(self) -> None: ...
+
+    async def wake_wristband(self) -> bool: ...
+    async def signal_pass(self) -> bool: ...
+    async def signal_deny(self) -> bool: ...
+    async def clear_wristband(self) -> bool: ...

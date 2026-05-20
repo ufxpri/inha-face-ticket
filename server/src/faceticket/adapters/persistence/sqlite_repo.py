@@ -1,7 +1,6 @@
-"""발급 세션 SQLite 저장소.
+"""SQLite 구현체 — `IIssueRepository` 충족.
 
-좌석 ↔ 팔찌 ID 매핑은 발급 시스템에만 영구 저장된다.
-입장 시스템은 팔찌 내부 임베딩만으로 판정하므로 DB가 필요 없다.
+스키마는 기존과 동일 (구 `issue.db` 그대로 열린다).
 """
 from __future__ import annotations
 
@@ -11,6 +10,7 @@ import threading
 from pathlib import Path
 from typing import Optional
 
+from faceticket.application.ports import IIssueRepository, IssueRecord
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS issues (
@@ -29,7 +29,7 @@ def _now() -> str:
     return datetime.datetime.now().isoformat(timespec="seconds")
 
 
-class IssueDB:
+class SqliteIssueRepository(IIssueRepository):
     def __init__(self, path: Path) -> None:
         self.conn = sqlite3.connect(str(path), check_same_thread=False)
         self.lock = threading.Lock()
@@ -65,7 +65,7 @@ class IssueDB:
             cols = ["id", "wristband_id", "seat", "name", "issued_at"]
             return [dict(zip(cols, r)) for r in cur.fetchall()]
 
-    def find_active_by_wristband(self, wristband_id: str) -> Optional[dict]:
+    def find_active_by_wristband(self, wristband_id: str) -> Optional[IssueRecord]:
         with self.lock:
             cur = self.conn.execute(
                 "SELECT id, wristband_id, seat, name, issued_at "
@@ -75,7 +75,8 @@ class IssueDB:
             row = cur.fetchone()
             if not row:
                 return None
-            return dict(zip(["id","wristband_id","seat","name","issued_at"], row))
+            return IssueRecord(id=row[0], wristband_id=row[1], seat=row[2],
+                               name=row[3], issued_at=row[4])
 
     def close(self) -> None:
         with self.lock:

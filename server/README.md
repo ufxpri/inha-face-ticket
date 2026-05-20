@@ -1,32 +1,74 @@
 # server — FastAPI 노트북 서버
 
-`app.main:app` 를 uvicorn 으로 띄우는 FastAPI 애플리케이션. 발급/입장/반납 절차의 비즈니스 로직 (`FlowController`), WebSocket 브로드캐스트 (`ClientPool`), 운영자 장치 레지스트리 (`DeviceRegistry`) 를 담는다.
+도메인 / 유스케이스 / 어댑터 3계층으로 재구성된 `faceticket` 패키지.
 
 ## 실행
 
 ```bash
+cd server
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python -m app.main
+pip install -e .              # pyproject.toml 사용
+# 또는 ML 모델까지:
+pip install -e ".[ml,dev]"
+
+faceticket --host 0.0.0.0 --port 8000
+# 또는
+python -m faceticket
 ```
 
-import 경로는 모두 `app.*` 네임스페이스를 사용한다. `server/` 디렉터리에서 실행해야 한다.
+환경변수: `FT_HOST`, `FT_PORT`, `FT_ISSUANCE_PORT`, `FT_ENTRY_PORT`, `FT_BLE_MOCK`, `FT_FACE_STUB`.
 
-## 모듈
+## 패키지 구조
 
-| 파일 | 역할 |
+```
+src/faceticket/
+├── domain/                pure: states / session / embedding / frontality / errors
+├── application/
+│   ├── ports/             IFaceRecognizer · IBleCentral · IOperatorDevice · IIssueRepository · IPresenter
+│   ├── flows/             IssueFlow · EntryFlow · ReturnFlow
+│   ├── flow_runner.py     세 플로우 dispatch + 세션 소유
+│   ├── device_service.py
+│   └── toggle_service.py
+├── adapters/
+│   ├── face/              FacenetRecognizer · HashStubRecognizer · factory
+│   ├── ble/               BleakBleCentral · MockBleCentral · BleSwap (명시적 hot-swap)
+│   ├── devices/           SerialTransport · IssuanceDevice · EntryDevice · DeviceRegistry · list_serial_ports
+│   ├── persistence/       SqliteIssueRepository
+│   └── web/               app_factory · lifespan · http_routes · ws_admin · ws_tablet · ws_protocol · presenter · client_pool
+├── config/                paths · ble_uuids · face_thresholds · led_codes · settings
+├── infra/                 logging · container (composition root)
+├── cli.py                 uvicorn 진입점
+└── web/                   static (JSX) + templates (HTML)
+```
+
+## 아키텍처 원칙
+
+| 계층 | import 가능 |
 |---|---|
-| `app/main.py`           | FastAPI 라우트 + WS 핸들러 + 흐름 컨트롤러 |
-| `app/config.py`         | 경로 / UUID / 임곗값 / mock 플래그 |
-| `app/states.py`         | State, Flow 열거형 (브라우저 `states.js` 미러) |
-| `app/db.py`             | SQLite 발급 세션 |
-| `app/face.py`           | facenet-pytorch 임베딩 + 코사인 유사도 |
-| `app/ble_client.py`     | BLE Central (bleak / mock) |
-| `app/devices/registry.py`  | DeviceRegistry — 발급/입장 장치 mutex |
-| `app/devices/issuance.py`  | NFC 라이터 + 게이트 아두이노 |
-| `app/devices/entry.py`     | ESP32-C3 팔찌 USB-CDC 직결 |
+| `domain/`        | stdlib, numpy |
+| `application/`   | domain.*, application.ports.* |
+| `adapters/`      | application.ports, domain.*, 3rd-party (FastAPI / bleak / pyserial / SQLite) |
+| `config/`        | stdlib |
+| `infra/`         | adapters + application 조립용 |
 
-## 정적 자산
+도메인이 wire format(WS dict) 을 만들지 않는다. flows / services 는 `IPresenter` 만 호출,
+`WebSocketPresenter` 어댑터에서 한 곳에서만 직렬화. 모든 메시지 빌더는 `adapters/web/ws_protocol.py`.
 
-- `app/web/static/*.jsx` — Babel-standalone 으로 브라우저에서 변환
-- `app/web/templates/{admin,tablet}.html` — 진입 HTML
+## 테스트
+
+```bash
+pytest                       # 도메인 + 어댑터 단위 테스트
+```
+
+## 구 구조와 차이
+
+| 구 (`app/`)                | 신 (`src/faceticket/`)                              |
+|---|---|
+| `main.py` 602줄            | `cli.py` + `adapters/web/{app_factory,ws_admin,ws_tablet,http_routes,lifespan}` |
+| `FlowController` god-class | `application/flows/{issuance,entry,return_}.py` + `flow_runner.py` |
+| WS dict 리터럴 산재         | `adapters/web/ws_protocol.py` 한 곳에서 빌더 |
+| `BLEClient.__getattr__` 마법| `BleSwap(IBleCentral)` 명시적 forwarding |
+| `IssuanceDevice`/`EntryDevice` 80% 복붙 | `SerialTransport` 공유 + 1줄짜리 프로토콜 매핑 |
+| `print()` 곳곳              | `logging.getLogger(__name__)` + console/WS sink |
+| `config.py` 한 파일 grab-bag | `config/{paths,ble_uuids,face_thresholds,led_codes,settings}.py` |
+| `states.py` + `states.js` 수동 미러 | `FlowState`/`Flow` enum + JS 측은 문자열 리터럴 직접 비교 |
