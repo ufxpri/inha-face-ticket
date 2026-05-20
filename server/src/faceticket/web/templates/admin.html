@@ -22,17 +22,44 @@
 <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
 
-<!-- 상태/모드 상수 (states.py 미러) — JSX 들이 window.STATE / window.FLOW 로 참조 -->
-<script src="/static/states.js"></script>
+<!-- Theme + data fixtures + tiny libs (no JSX, plain JS) -->
+<script src="/static/theme/theme.jsx"></script>
+<script src="/static/data/show-fixture.js"></script>
+<script src="/static/lib/srand.js"></script>
 
-<!-- 두 entry 가 공유하는 atom (Scaler 등) — entry jsx 보다 앞서 로드 -->
-<script type="text/babel" src="/static/app-common.jsx" data-presets="react"></script>
+<!-- Lib (JSX) -->
+<script type="text/babel" src="/static/lib/scaler.jsx" data-presets="react"></script>
 
-<script type="text/babel" src="/static/theme.jsx" data-presets="react"></script>
-<script type="text/babel" src="/static/parts.jsx" data-presets="react"></script>
-<script type="text/babel" src="/static/concert.jsx" data-presets="react"></script>
-<script type="text/babel" src="/static/scenes.jsx" data-presets="react"></script>
-<script type="text/babel" src="/static/concert-scenes.jsx" data-presets="react"></script>
-<script type="text/babel" src="/static/admin-app.jsx" data-presets="react"></script>
+<!-- Atoms (consume theme/data) -->
+<script type="text/babel" src="/static/atoms/face-portrait.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/atoms/radial-viz.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/atoms/kv.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/atoms/status-chip.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/atoms/mono-line.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/atoms/data-bars.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/atoms/section-heading.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/atoms/form-field.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/atoms/big-button.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/atoms/table.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/atoms/zone-badge.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/atoms/show-countdown.jsx" data-presets="react"></script>
+
+<!-- Molecules (compose atoms + data) -->
+<script type="text/babel" src="/static/molecules/hero-face.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/molecules/ticket-stub.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/molecules/show-strip.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/molecules/showtime-timeline.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/molecules/stage-map.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/molecules/setlist-panel.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/molecules/capacity-gauge.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/molecules/admin-header.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/molecules/device-panel.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/molecules/log-feed.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/molecules/tablet-mirror.jsx" data-presets="react"></script>
+
+<!-- Admin layer: hooks then view then root entry -->
+<script type="text/babel" src="/static/admin/hooks.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/admin/admin-live.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/admin/admin-app.jsx" data-presets="react"></script>
 </body>
 </html>
