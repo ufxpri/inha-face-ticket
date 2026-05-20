@@ -1,0 +1,13 @@
+# 필수 — 서버 동작에 반드시 필요
+fastapi>=0.110
+uvicorn[standard]>=0.27
+numpy>=1.24
+Pillow>=10.0
+pyserial>=3.5
+bleak>=0.21
+
+# 얼굴 임베딩 (PyTorch 기반). 미설치 시 face.py 가 자동 stub 모드로 폴백.
+# CPU 만 사용해도 InceptionResnetV1 한 장 추론 ≈ 수십~수백 ms 라 충분.
+torch>=2.2
+torchvision>=0.17
+facenet-pytorch>=2.5

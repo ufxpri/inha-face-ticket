@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FACEPASS · operator — ZERO POINT TOUR 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #0a0807; }
+  body { font-family: 'IBM Plex Sans KR', system-ui, sans-serif; color: #15110b; overflow: hidden; }
+  *, *::before, *::after { box-sizing: border-box; }
+  #root { width: 100%; height: 100%; }
+  input { font-family: inherit; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js"></script>
+
+<!-- 상태/모드 상수 (states.py 미러) — JSX 들이 window.STATE / window.FLOW 로 참조 -->
+<script src="/static/states.js"></script>
+
+<!-- 두 entry 가 공유하는 atom (Scaler 등) — entry jsx 보다 앞서 로드 -->
+<script type="text/babel" src="/static/app-common.jsx" data-presets="react"></script>
+
+<script type="text/babel" src="/static/theme.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/parts.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/concert.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/scenes.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/concert-scenes.jsx" data-presets="react"></script>
+<script type="text/babel" src="/static/admin-app.jsx" data-presets="react"></script>
+</body>
+</html>

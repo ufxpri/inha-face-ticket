@@ -1,0 +1,45 @@
+# ── Python ──────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# venv
+.venv/
+venv/
+env/
+
+# 빌드 산출물
+build/
+dist/
+*.egg-info/
+
+# ── PlatformIO / Arduino ────────────────────────────────────
+.pio/
+.pioenvs/
+.piolibdeps/
+.clang_complete
+.gcc-flags.json
+
+# ── 런타임 데이터 ───────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── 에디터 / OS ─────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+*.code-workspace
+*.swp
+*~
+
+# ── Node (있을 경우) ────────────────────────────────────────
+node_modules/
+
+# ── 환경 설정 (비밀) ────────────────────────────────────────
+.env
+.env.local
