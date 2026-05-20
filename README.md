@@ -2,33 +2,46 @@
 
 오프라인 얼굴인증 전자 티켓 시스템 — 인하대학교 IoT프로그래밍(ITC3211) 기말 과제.
 
-발급장치(NFC + 게이트 아두이노) / 입장장치(ESP32-C3 팔찌 USB-CDC) / 노트북 FastAPI 서버 / 태블릿 카메라 / BLE 팔찌 펌웨어로 구성된 멀티-디바이스 시스템.
+발급장치(NFC + 게이트 아두이노) / 입장장치(ESP32-C3 팔찌 USB-CDC 직결) / 노트북 FastAPI 서버 / 태블릿 카메라 / ESP32-C3 BLE 팔찌 펌웨어로 구성된 멀티-디바이스 시스템.
 
 ## 리포지토리 레이아웃
 
 ```
 .
-├── server/                  FastAPI 서버 (Python)
-│   ├── app/
-│   │   ├── main.py          진입점 (uvicorn app.main:app)
-│   │   ├── config.py        UUID / 임곗값 / 경로
-│   │   ├── face.py          얼굴 임베딩 (facenet-pytorch / 폴백 stub)
-│   │   ├── ble_client.py    BLE Central (bleak / mock)
-│   │   ├── db.py            SQLite 발급 세션
-│   │   ├── states.py        State / Flow 열거형
-│   │   ├── devices/         발급장치 · 입장장치 · 레지스트리
-│   │   └── web/
-│   │       ├── static/      JSX, JS (Babel-standalone 으로 브라우저 변환)
-│   │       └── templates/   admin.html, tablet.html
-│   └── requirements.txt
+├── server/                          FastAPI 서버 (Python 3.11+)
+│   ├── pyproject.toml               패키지 메타 + extras (ml, dev)
+│   ├── requirements.txt             (구버전 호환용)
+│   ├── README.md                    백엔드 상세
+│   ├── src/faceticket/              패키지 루트
+│   │   ├── domain/                  순수 타입/규칙 (states / session / embedding / frontality / errors)
+│   │   ├── application/             유스케이스 (flows: issue/entry/return) + 포트(Protocol)
+│   │   │   ├── ports/               IFaceRecognizer · IBleCentral · IOperatorDevice · IIssueRepository · IPresenter
+│   │   │   ├── flows/
+│   │   │   ├── flow_runner.py
+│   │   │   ├── device_service.py
+│   │   │   └── toggle_service.py
+│   │   ├── adapters/                I/O 구현 (FastAPI, bleak, pyserial, SQLite, facenet-pytorch)
+│   │   │   ├── face/                FacenetRecognizer · HashStubRecognizer
+│   │   │   ├── ble/                 BleakBleCentral · MockBleCentral · BleSwap (명시적 hot-swap)
+│   │   │   ├── devices/             SerialTransport · IssuanceDevice · EntryDevice · DeviceRegistry
+│   │   │   ├── persistence/         SqliteIssueRepository
+│   │   │   └── web/                 app_factory · lifespan · ws_protocol · ws_admin · ws_tablet · presenter
+│   │   ├── config/                  paths · ble_uuids · face_thresholds · led_codes · settings
+│   │   ├── infra/                   logging · container (composition root)
+│   │   ├── cli.py                   uvicorn 진입 (python -m faceticket)
+│   │   └── web/                     static (JSX, window.FT 네임스페이스) + templates
+│   └── tests/
 ├── firmware/
-│   ├── wristband/           ESP32-C3 팔찌 (PlatformIO)
-│   ├── arduino-gate/        Arduino UNO NFC + 게이트
-│   └── tools/
-│       └── i2c-scanner/     디버그 도구
-├── docs/                    아키텍처 / 프로토콜 문서
-├── hardware/                회로도, 핀맵
-└── scripts/                 개발 헬퍼
+│   ├── wristband/                   ESP32-C3 팔찌 (PlatformIO)
+│   ├── arduino-gate/                Arduino UNO NFC + 게이트
+│   └── tools/i2c-scanner/           디버그 도구
+├── docs/
+│   ├── architecture.md              계층/의존성 규칙
+│   ├── ble-protocol.md              GATT 정의 + 청크 프로토콜
+│   ├── serial-protocol.md           시리얼 명령/응답
+│   └── ws-protocol.md               WebSocket 메시지 스키마
+├── hardware/
+└── scripts/
 ```
 
 ## 빠른 시작 (서버)
@@ -36,22 +49,37 @@
 ```bash
 cd server
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python -m app.main         # 또는 uvicorn app.main:app --host 0.0.0.0 --port 8000
+pip install -e .                    # 또는 pip install -e ".[ml,dev]" — 실제 얼굴 모델 포함
+faceticket --port 8000              # 또는 python -m faceticket
 ```
 
 - 운영자 페이지: <http://localhost:8000/admin>
 - 태블릿 페이지: <http://<노트북IP>:8000/tablet> (카메라 권한 필요 — `localhost` 또는 HTTPS)
 
+설정은 환경변수: `FT_HOST`, `FT_PORT`, `FT_BLE_MOCK`, `FT_FACE_STUB`, `FT_ISSUANCE_PORT`, `FT_ENTRY_PORT`, `FT_SERIAL_BAUD`.
+
 ## 펌웨어 빌드
 
 ```bash
-cd firmware/wristband
-pio run -t upload && pio device monitor
+cd firmware/wristband && pio run -t upload && pio device monitor
 ```
 
 `firmware/arduino-gate/arduino_uno.ino` 는 Arduino IDE 또는 `arduino-cli` 로 업로드.
 
 ## 동작 모드
 
-`server/app/config.py` 의 `BLE_MOCK`, `AUTO_CONNECT_*_PORT` 와 의존성 설치 여부에 따라 각 레이어가 자동으로 실제/mock 으로 전환된다. 자세한 흐름과 BLE GATT/시리얼 프로토콜은 `docs/` 참고.
+| 레이어 | 의존성 | mock 동작 |
+|---|---|---|
+| 얼굴 (`adapters/face`) | `facenet-pytorch` (선택) | 이미지 SHA-256 시드 결정적 임베딩 |
+| BLE (`adapters/ble`) | `bleak` (선택) | 메모리상 가짜 팔찌 상태 |
+| 시리얼 (`adapters/devices`) | `pyserial` + 실제 포트 | `SIM` 포트 명시 시 명령별 모의 응답 |
+
+각 레이어는 의존성이 없거나 mock 강제 설정 시 자동으로 mock 으로 폴백. 운영자 페이지 상단 배지에서 현재 모드 확인 가능.
+
+## 아키텍처 (한 줄)
+
+도메인(`domain/`)은 numpy 외에 import 없음 → 유스케이스(`application/`)는 포트만 의존 → 어댑터(`adapters/`)가 포트를 구현하며 FastAPI / BLE / 시리얼 / SQLite 와 통신. 상세는 [`docs/architecture.md`](docs/architecture.md).
+
+## 라이선스
+
+MIT (예정).
