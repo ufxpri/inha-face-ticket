@@ -13,6 +13,22 @@ const HERO_SIZE        = 580;
 const HERO_FACE_RATIO  = 0.62;
 const CAMERA_ZONE_H    = 680;   // hero 580 + 라벨 위/아래 마진 + 약간의 호흡
 
+// view 마다 결정되는 다섯 가지 속성을 한 표에서 lookup. 새 view 추가 시 여기 한 줄만.
+// chipKind/heroStatus: 'idle'|'scan'|'pass'|'deny' — StatusChip / HeroFace 색상 톤
+// headerMode: TabletHeader 의 'idle'|'issue'|'pass'|'deny' 분기
+// confidence: HeroFace 의 cos.sweep 시각화 0..1
+// isResult: 정보 zone 에 ResultCard 표시할지 여부
+const VIEW_META = {
+  'idle':            { chipKind: 'idle', heroStatus: 'idle', headerMode: 'idle',  confidence: 0,    isResult: false, chipText: 'STANDBY · 입장 대기 / WAITING' },
+  'capturing-issue': { chipKind: 'scan', heroStatus: 'scan', headerMode: 'issue', confidence: 0.55, isResult: false, chipText: '얼굴 캡처 중 · CAPTURING (ISSUE)' },
+  'capturing-entry': { chipKind: 'scan', heroStatus: 'scan', headerMode: 'pass',  confidence: 0.55, isResult: false, chipText: '얼굴 캡처 중 · CAPTURING (ENTRY)' },
+  'issue-await-tag': { chipKind: 'pass', heroStatus: 'pass', headerMode: 'pass',  confidence: 0.86, isResult: true,  chipText: '팔찌 태그 대기 · AWAITING WRISTBAND' },
+  'pass-issue':      { chipKind: 'pass', heroStatus: 'pass', headerMode: 'issue', confidence: 0.96, isResult: true,  chipText: '발급 완료 · WRISTBAND ISSUED' },
+  'pass-entry':      { chipKind: 'pass', heroStatus: 'pass', headerMode: 'pass',  confidence: 0.96, isResult: true,  chipText: '입장 허가 · ACCESS GRANTED' },
+  'pass-return':     { chipKind: 'pass', heroStatus: 'pass', headerMode: 'pass',  confidence: 0.96, isResult: true,  chipText: '반납 완료 · WRISTBAND RETURNED' },
+  'deny':            { chipKind: 'deny', heroStatus: 'deny', headerMode: 'deny',  confidence: 0.41, isResult: true,  chipText: '입장 거부 · ACCESS DENIED' },
+};
+
 function TabletLive({ t, view, seq, subj, videoRef, countdown, footer, cosineThreshold, audioReady }) {
   const { StatusChip, MonoLine, FadeSlot } = FT.atoms;
   const {
@@ -20,35 +36,14 @@ function TabletLive({ t, view, seq, subj, videoRef, countdown, footer, cosineThr
     HeroFace, ResultCard,
   } = FT.molecules;
 
+  const meta         = VIEW_META[view] || VIEW_META.idle;
   const isIdle       = view === 'idle';
   const isCapturing  = view === 'capturing-issue' || view === 'capturing-entry';
-  const isAwaitTag   = view === 'issue-await-tag';
-  const isPassIssue  = view === 'pass-issue';
   const isPassEntry  = view === 'pass-entry';
-  const isPassReturn = view === 'pass-return';
+  const isPassIssue  = view === 'pass-issue';
+  const isAwaitTag   = view === 'issue-await-tag';
   const isDeny       = view === 'deny';
-  const isResult     = isAwaitTag || isPassIssue || isPassEntry || isPassReturn || isDeny;
-
-  const headerMode = isIdle ? 'idle'
-                   : (isPassIssue || view === 'capturing-issue') ? 'issue'
-                   : isDeny ? 'deny' : 'pass';
-
-  const chipKind = isIdle ? 'idle' : isDeny ? 'deny' : isCapturing ? 'scan' : 'pass';
-  const chipText = isIdle ? 'STANDBY · 입장 대기 / WAITING'
-                 : view === 'capturing-issue' ? '얼굴 캡처 중 · CAPTURING (ISSUE)'
-                 : view === 'capturing-entry' ? '얼굴 캡처 중 · CAPTURING (ENTRY)'
-                 : isAwaitTag ? '팔찌 태그 대기 · AWAITING WRISTBAND'
-                 : isPassIssue ? '발급 완료 · WRISTBAND ISSUED'
-                 : isPassEntry ? '입장 허가 · ACCESS GRANTED'
-                 : isPassReturn ? '반납 완료 · WRISTBAND RETURNED'
-                 : '입장 거부 · ACCESS DENIED';
-
-  const heroStatus = isIdle ? 'idle' : isDeny ? 'deny' : isCapturing ? 'scan' : 'pass';
-  const confidence = isIdle ? 0
-                   : isCapturing ? 0.55
-                   : isDeny ? 0.41
-                   : isAwaitTag ? 0.86 : 0.96;
-  const heroEmbedding = isResult ? subj.embedding : null;
+  const heroEmbedding = meta.isResult ? subj.embedding : null;
 
   return (
     <div style={{
@@ -59,7 +54,7 @@ function TabletLive({ t, view, seq, subj, videoRef, countdown, footer, cosineThr
       <TicketStub t={t} ticketId={subj.ticketId} seat={subj.seat} />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <TabletHeader t={t} mode={headerMode} />
+        <TabletHeader t={t} mode={meta.headerMode} />
         <ShowStrip t={t} />
 
         <div style={{
@@ -71,7 +66,7 @@ function TabletLive({ t, view, seq, subj, videoRef, countdown, footer, cosineThr
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             flexShrink: 0,
           }}>
-            <StatusChip t={t} kind={chipKind}>{chipText}</StatusChip>
+            <StatusChip t={t} kind={meta.chipKind}>{meta.chipText}</StatusChip>
             <div style={{ display: 'flex', gap: 14 }}>
               <MonoLine t={t} letter={1.5}>ML · facenet-pytorch v1.3</MonoLine>
               <MonoLine t={t} letter={1.5}>SEQ · #{String(seq).padStart(4, '0')}</MonoLine>
@@ -89,10 +84,10 @@ function TabletLive({ t, view, seq, subj, videoRef, countdown, footer, cosineThr
             alignItems: 'center', justifyContent: 'center',
           }}>
             {/* HeroFace — 자리 고정, view 전이에도 동일 props 그대로 */}
-            <HeroFace t={t} source="video" status={heroStatus}
+            <HeroFace t={t} source="video" status={meta.heroStatus}
                       size={HERO_SIZE} faceRatio={HERO_FACE_RATIO}
                       videoRef={videoRef} embedding={heroEmbedding}
-                      confidence={confidence} embDim={512} />
+                      confidence={meta.confidence} embDim={512} />
 
             {/* 카메라 ZONE 상단에 떠 있는 가이드 오버레이 — 카메라를 건드리지 않음 */}
             <div style={{
@@ -146,7 +141,7 @@ function TabletLive({ t, view, seq, subj, videoRef, countdown, footer, cosineThr
             <FadeSlot.Item show={isIdle} style={{ justifyContent: 'flex-start', padding: '4px 0' }}>
               <IdleCallout t={t} />
             </FadeSlot.Item>
-            <FadeSlot.Item show={isResult} style={{ justifyContent: 'flex-start', padding: '4px 0' }}>
+            <FadeSlot.Item show={meta.isResult} style={{ justifyContent: 'flex-start', padding: '4px 0' }}>
               <ResultCard t={t} kind={view} subj={subj}
                           cosVal={isPassEntry ? subj.cos : (isDeny ? subj.cos : null)}
                           fadedCos={isAwaitTag || isPassIssue}

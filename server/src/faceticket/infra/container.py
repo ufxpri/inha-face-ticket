@@ -17,7 +17,9 @@ from faceticket.adapters.web.presenter import WebSocketPresenter
 from faceticket.application.device_service import DeviceService
 from faceticket.application.flow_runner import FlowRunner
 from faceticket.application.flows import EntryFlow, IssueFlow, ReturnFlow
-from faceticket.application.ports import IFaceRecognizer, IIssueRepository, IPresenter
+from faceticket.application.ports import (
+    IFaceRecognizer, IIssueRepository, IOperatorDevice, IPresenter,
+)
 from faceticket.application.toggle_service import ToggleService
 from faceticket.config import DB_PATH, Settings
 from faceticket.domain.session import Session
@@ -32,7 +34,7 @@ class Container:
     face: IFaceRecognizer
     ble: BleSwap
     repo: IIssueRepository
-    device: OperatorDevice
+    device: IOperatorDevice
     admins: ClientPool
     tablets: ClientPool
     presenter: IPresenter

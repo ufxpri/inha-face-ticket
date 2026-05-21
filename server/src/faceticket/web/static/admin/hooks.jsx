@@ -55,7 +55,7 @@ function useAdminWebSocket({ appendLog, onState, onFlags, onEmbedding }) {
 function useAdminState() {
   const [mode, setMode] = _useState('issue');
   const [fsmState, setFsmState] = _useState('idle');
-  const [form, setForm] = _useState({ seat: '', zone: '', name: '', ticketId: '' });
+  const [form, setForm] = _useState({ seat: '', name: '' });
   const [log, setLog] = _useState([]);
   const [flags, setFlags] = _useState({
     ml: true, bleMock: true,
@@ -112,18 +112,15 @@ function useAdminState() {
   const fillRandomIfEmpty = _useCallback(() => {
     const pick = a => a[Math.floor(Math.random() * a.length)];
     const pad = (n, w) => String(n).padStart(w, '0');
-    const [zPrefix, zLabel] = pick(FT.data.RANDOM_ZONES);
+    const [zPrefix] = pick(FT.data.RANDOM_ZONES);
     const block = String.fromCharCode(65 + Math.floor(Math.random() * 4));
     const row = 1 + Math.floor(Math.random() * 18);
     const seatNo = 1 + Math.floor(Math.random() * 12);
     const seat = `${zPrefix}·${block} / R${pad(row,2)}·S${pad(seatNo,2)}`;
     const [nameKo] = pick(FT.data.RANDOM_NAMES);
-    const ticket = `NF-26-${pad(1 + Math.floor(Math.random()*12),2)}${pad(1 + Math.floor(Math.random()*28),2)}-${pad(Math.floor(Math.random()*10000),4)}`;
     const next = {
-      seat:     form.seat.trim()     || seat,
-      zone:     form.zone.trim()     || zLabel,
-      name:     form.name.trim()     || nameKo,
-      ticketId: form.ticketId.trim() || ticket,
+      seat: form.seat.trim() || seat,
+      name: form.name.trim() || nameKo,
     };
     setForm(next);
     return next;
