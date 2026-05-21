@@ -1,10 +1,8 @@
 window.FT = window.FT || {};
 FT.molecules = FT.molecules || {};
 
-// DevicePanel — issuance/entry serial connection card. Always offers a SIM
-// fallback so absent hardware still lets the procedure run.
-function DevicePanel({ t, label, deviceKey, status, ports, otherConnected, busy,
-                       onConnect, onDisconnect, onRefresh }) {
+// DevicePanel — 단일 운영자 장치 시리얼 연결 카드. SIM 폴백을 항상 제공.
+function DevicePanel({ t, status, ports, busy, onConnect, onDisconnect, onRefresh }) {
   const { useState, useEffect } = React;
   const SIM_OPT = { device: 'SIM', description: '가상 시뮬레이션 (시리얼 미사용)', vid_pid: '' };
   const allPorts = [SIM_OPT, ...ports];
@@ -19,11 +17,9 @@ function DevicePanel({ t, label, deviceKey, status, ports, otherConnected, busy,
   }, [ports, status.connected]);
 
   const connected = status.connected;
-  const canConnect = !connected && !otherConnected && !busy && !!selected;
+  const canConnect = !connected && !busy && !!selected;
   const canDisconnect = connected && !busy;
-  const tip = otherConnected ? '다른 장치 사용 중'
-            : busy           ? '진행 중에는 변경 불가'
-            : !selected      ? '포트를 선택하세요' : '';
+  const tip = busy ? '진행 중에는 변경 불가' : !selected ? '포트를 선택하세요' : '';
 
   return (
     <div style={{
@@ -32,7 +28,9 @@ function DevicePanel({ t, label, deviceKey, status, ports, otherConnected, busy,
       padding: '10px 12px', marginBottom: 8,
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <span style={{ fontFamily: t.monoFamily, fontSize: 11, letterSpacing: 1.5, color: t.ink }}>{label}</span>
+        <span style={{ fontFamily: t.monoFamily, fontSize: 11, letterSpacing: 1.5, color: t.ink }}>
+          운영자 장치 · OPERATOR
+        </span>
         <span style={{
           fontFamily: t.monoFamily, fontSize: 10, letterSpacing: 1.5,
           padding: '2px 6px',
@@ -65,7 +63,7 @@ function DevicePanel({ t, label, deviceKey, status, ports, otherConnected, busy,
         }}>↻</div>
       </div>
       <div style={{ display: 'flex', gap: 4 }}>
-        <div onClick={canConnect ? () => onConnect(deviceKey, selected) : undefined}
+        <div onClick={canConnect ? () => onConnect(selected) : undefined}
              title={canConnect ? '' : tip}
              style={{
           flex: 1, padding: '6px 8px', textAlign: 'center',
@@ -76,7 +74,7 @@ function DevicePanel({ t, label, deviceKey, status, ports, otherConnected, busy,
           cursor: canConnect ? 'pointer' : 'not-allowed', userSelect: 'none',
           opacity: canConnect ? 1 : 0.6,
         }}>CONNECT</div>
-        <div onClick={canDisconnect ? () => onDisconnect(deviceKey) : undefined}
+        <div onClick={canDisconnect ? onDisconnect : undefined}
              style={{
           flex: 1, padding: '6px 8px', textAlign: 'center',
           background: t.surface, color: canDisconnect ? t.ink : t.mute,

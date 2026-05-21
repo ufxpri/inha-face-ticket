@@ -18,19 +18,17 @@ function useAdminWebSocket({ appendLog, onState, onFlags, onEmbedding }) {
     ws.onmessage = ev => {
       const m = JSON.parse(ev.data);
       if (m.type === 'hello' || m.type === 'flags') {
+        const dev = m.device_status || { connected: false, port: null };
         onFlags({
           ml: !!m.ml,
           bleMock: !!m.ble_mock,
           faceAvailable: !!m.face_available,
           bleAvailable: !!m.ble_available,
-          issuanceStatus: m.issuance_status || { connected: false, port: null },
-          entryStatus:    m.entry_status    || { connected: false, port: null },
-          activeDevice:   m.active || null,
+          deviceStatus:   dev,
           availablePorts: Array.isArray(m.available_ports) ? m.available_ports : [],
         });
         if (m.type === 'hello') {
-          const ac = m.active ? `${m.active}@${
-            (m.active === 'issuance' ? m.issuance_status : m.entry_status)?.port}` : 'none';
+          const ac = dev.connected ? `operator@${dev.port}` : 'none';
           appendLog(`hello · face=${m.ml?'ML':'stub'} · ble=${m.ble_mock?'mock':'real'} · io=${ac}`);
         }
       } else if (m.type === 'log') {
@@ -62,9 +60,7 @@ function useAdminState() {
   const [flags, setFlags] = _useState({
     ml: true, bleMock: true,
     faceAvailable: true, bleAvailable: true,
-    issuanceStatus: { connected: false, port: null },
-    entryStatus:    { connected: false, port: null },
-    activeDevice:   null,
+    deviceStatus:   { connected: false, port: null },
     availablePorts: [],
   });
   const [seq, setSeq] = _useState(188);

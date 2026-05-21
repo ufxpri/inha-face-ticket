@@ -77,7 +77,7 @@ class EntryFlow(FlowBase):
         if self.session.embedding is None:
             return EntryFaceResult(False, 0.0, "내부 상태 오류 — 저장 임베딩 없음")
 
-        dev = self.devices.active   # None 일 수도 있음 (그 사이 disconnect)
+        dev = self.device if self.device.is_connected else None   # 그 사이 disconnect 가능
         sim = cosine(self.session.embedding, live_embedding)
         await self.presenter.emit_log(
             f"⑤ 코사인 유사도 = {sim:.4f} (임곗값 {COSINE_THRESHOLD})"

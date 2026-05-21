@@ -2,16 +2,14 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
-from faceticket.application.ports import IFaceRecognizer, IPresenter
+from faceticket.application.ports import IFaceRecognizer, IOperatorDevice, IPresenter
 from faceticket.config import COSINE_THRESHOLD
 from faceticket.domain.session import Session
 
 if TYPE_CHECKING:
     from faceticket.adapters.ble.swap import BleSwap
-    from faceticket.adapters.devices.registry import DeviceRegistry
-    from faceticket.adapters.devices.ports import list_serial_ports
 
 log = logging.getLogger(__name__)
 
@@ -24,14 +22,14 @@ class ToggleService:
         *,
         face: IFaceRecognizer,
         ble_swap: "BleSwap",
-        registry: "DeviceRegistry",
+        device: IOperatorDevice,
         session: Session,
         presenter: IPresenter,
         tablet_count_provider,                 # () -> int
     ) -> None:
         self.face = face
         self.ble_swap = ble_swap
-        self.registry = registry
+        self.device = device
         self.session = session
         self.presenter = presenter
         self._tablet_count = tablet_count_provider
@@ -63,12 +61,11 @@ class ToggleService:
 
         await self.broadcast_flags()
 
-    # ── 스냅샷 / 플래그 송신 ──────────────────────────────────
+    # ── 스냅샷 ────────────────────────────────────────────────
     def snapshot(self) -> dict:
-        # adapters 의존을 런타임에 lazy import 해서 순환 회피
         from faceticket.adapters.devices.ports import list_serial_ports
 
-        snap = {
+        return {
             "ml":               self.face.is_ml_active,
             "ble_mock":         self.ble_swap.is_mock,
             "face_available":   self.face.has_ml,
@@ -76,9 +73,11 @@ class ToggleService:
             "tablet_clients":   self._tablet_count(),
             "cosine_threshold": COSINE_THRESHOLD,
             "available_ports":  list_serial_ports(),
+            "device_status":    {
+                "connected": self.device.is_connected,
+                "port":      self.device.port,
+            },
         }
-        snap.update(self.registry.snapshot())
-        return snap
 
     async def broadcast_flags(self) -> None:
         await self.presenter.emit_flags(self.snapshot())

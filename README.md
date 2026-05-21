@@ -2,7 +2,7 @@
 
 오프라인 얼굴인증 전자 티켓 시스템 — 인하대학교 IoT프로그래밍(ITC3211) 기말 과제.
 
-발급장치(NFC + 게이트 아두이노) / 입장장치(ESP32-C3 팔찌 USB-CDC 직결) / 노트북 FastAPI 서버 / 태블릿 카메라 / ESP32-C3 BLE 팔찌 펌웨어로 구성된 멀티-디바이스 시스템.
+통합 운영자 장치(Arduino UNO + NFC writer + 게이트 서보 / 또는 ESP32-C3 팔찌 USB-CDC 직결, 둘 다 동일 프로토콜) / 노트북 FastAPI 서버 / 태블릿 카메라 / ESP32-C3 BLE 팔찌 펌웨어로 구성된 멀티-디바이스 시스템.
 
 ## 리포지토리 레이아웃
 
@@ -23,7 +23,7 @@
 │   │   ├── adapters/                I/O 구현 (FastAPI, bleak, pyserial, SQLite, facenet-pytorch)
 │   │   │   ├── face/                FacenetRecognizer · HashStubRecognizer
 │   │   │   ├── ble/                 BleakBleCentral · MockBleCentral · BleSwap (명시적 hot-swap)
-│   │   │   ├── devices/             SerialTransport · IssuanceDevice · EntryDevice · DeviceRegistry
+│   │   │   ├── devices/             SerialTransport · OperatorDevice (단일 통합 장치)
 │   │   │   ├── persistence/         SqliteIssueRepository
 │   │   │   └── web/                 app_factory · lifespan · ws_protocol · ws_admin · ws_tablet · presenter
 │   │   ├── config/                  paths · ble_uuids · face_thresholds · led_codes · settings
@@ -56,7 +56,7 @@ faceticket --port 8000              # 또는 python -m faceticket
 - 운영자 페이지: <http://localhost:8000/admin>
 - 태블릿 페이지: <http://<노트북IP>:8000/tablet> (카메라 권한 필요 — `localhost` 또는 HTTPS)
 
-설정은 환경변수: `FT_HOST`, `FT_PORT`, `FT_BLE_MOCK`, `FT_FACE_STUB`, `FT_ISSUANCE_PORT`, `FT_ENTRY_PORT`, `FT_SERIAL_BAUD`.
+설정은 환경변수: `FT_HOST`, `FT_PORT`, `FT_BLE_MOCK`, `FT_FACE_STUB`, `FT_OPERATOR_PORT`, `FT_SERIAL_BAUD`.
 
 ## 펌웨어 빌드
 

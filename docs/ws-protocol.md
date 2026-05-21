@@ -21,7 +21,7 @@
 | `embedding`        | admin      | `{embedding: number[], captured_at: "HH:MM:SS"}` |
 | `complete`         | tablet     | `{ok, msg, ...extra (wristband_id, seat, similarity, passed, returned, …)}` |
 | `active_list`      | admin      | `{items: IssueRecord[]}` |
-| `flags`            | admin      | 시스템 스냅샷 (ml, ble_mock, …) |
+| `flags`            | admin      | 시스템 스냅샷 (ml, ble_mock, device_status: {connected, port}, available_ports, …) |
 
 상태 전이: `idle → await_face → await_tag → done → idle` (발급)  ·  `idle → await_tag → await_face_entry → done → idle` (입장)  ·  `idle → await_tag → done → idle` (반납). `done` 은 약 2초간 머무른 뒤 자동으로 `idle` 로.
 
@@ -40,8 +40,8 @@
 | `cancel`           |                | 진행 중 절차 취소 |
 | `list_active`      |                | 현재 활성 발급 목록 요청 |
 | `toggle`           | `layer`("face"|"ble"), `mock`(bool) | mock 토글 |
-| `io_connect`       | `device`("issuance"|"entry"), `port` | 시리얼 장치 연결 |
-| `io_disconnect`    | `device` | 시리얼 장치 해제 |
+| `io_connect`       | `port`   | 운영자 장치 시리얼 연결 |
+| `io_disconnect`    |          | 운영자 장치 해제 |
 | `io_refresh_ports` |          | 시스템 시리얼 포트 목록 재조회 |
 
 태블릿 → 서버:

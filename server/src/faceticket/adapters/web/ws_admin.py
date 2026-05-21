@@ -54,7 +54,7 @@ class AdminWebSocketHandler:
         elif t == "cancel":           await self.flow.cancel()
         elif t == "list_active":      await self.flow.list_active()
         elif t == "toggle":           await self.toggles.toggle(cmd.layer, cmd.mock)
-        elif t == "io_connect":       await self.devices.connect(cmd.device, cmd.port)   # type: ignore[arg-type]
-        elif t == "io_disconnect":    await self.devices.disconnect(cmd.device)          # type: ignore[arg-type]
+        elif t == "io_connect":       await self.devices.connect(cmd.port)
+        elif t == "io_disconnect":    await self.devices.disconnect()
         elif t == "io_refresh_ports": await self.devices.refresh_ports()
         else:                         log.warning("알 수 없는 admin 메시지: %s", t)

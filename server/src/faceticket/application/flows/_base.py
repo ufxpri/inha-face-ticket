@@ -1,14 +1,13 @@
-"""공통 헬퍼 — 세 플로우가 공유하는 BLE 세션 컨텍스트 / abort 패턴."""
+"""공통 헬퍼 — 세 플로우가 공유하는 BLE 세션 컨텍스트 / 장치 확보."""
 from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from faceticket.domain.errors import MissingDeviceError
 
 if TYPE_CHECKING:
-    from faceticket.adapters.devices.registry import DeviceRegistry
     from faceticket.application.ports import IBleCentral, IOperatorDevice, IPresenter
     from faceticket.domain.session import Session
 
@@ -22,26 +21,24 @@ class FlowBase:
         self,
         *,
         ble: "IBleCentral",
-        devices: "DeviceRegistry",
+        device: "IOperatorDevice",
         session: "Session",
         presenter: "IPresenter",
     ) -> None:
         self.ble = ble
-        self.devices = devices
+        self.device = device
         self.session = session
         self.presenter = presenter
 
     # ── 장치 확보 ─────────────────────────────────────────────
     def require_device(self) -> "IOperatorDevice":
-        dev = self.devices.active
-        if dev is None:
+        if not self.device.is_connected:
             raise MissingDeviceError("운영자 장치 미연결 — admin 패널에서 연결 후 시도")
-        return dev
+        return self.device
 
     # ── BLE 컨텍스트 ──────────────────────────────────────────
     @asynccontextmanager
     async def ble_session(self, timeout: float = 15.0):
-        """연결 시도 → yield(연결결과) → 항상 disconnect."""
         ok = await self.ble.connect_wristband(timeout=timeout)
         try:
             yield ok

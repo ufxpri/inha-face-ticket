@@ -14,16 +14,17 @@ def make_lifespan(container):
     async def lifespan(app: FastAPI):
         log.info("서버 기동")
         s = container.settings
-        if s.auto_connect_issuance_port:
-            ok, reason = await container.registry.connect("issuance", s.auto_connect_issuance_port)
-            log.info("auto-connect issuance [%s] → %s", s.auto_connect_issuance_port, reason)
-        elif s.auto_connect_entry_port:
-            ok, reason = await container.registry.connect("entry", s.auto_connect_entry_port)
-            log.info("auto-connect entry [%s] → %s", s.auto_connect_entry_port, reason)
+        port = s.auto_connect_operator_port
+        if port:
+            ok = await container.device.connect(port)
+            log.info("auto-connect operator [%s] → %s", port, "OK" if ok else "fail")
         try:
             yield
         finally:
-            container.registry.disconnect_all()
+            try:
+                container.device.disconnect()
+            except Exception:
+                pass
             container.repo.close()
             log.info("서버 종료")
 

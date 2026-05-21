@@ -1,13 +1,16 @@
-"""입장장치 — ESP32-C3 팔찌 USB-CDC 직결.
+"""OperatorDevice — 통합 운영자 장치.
 
-프로토콜 (firmware/wristband/src/main.cpp 와 일치)
-    WAKE  → OK
-    PASS  → OK
-    DENY  → OK
-    CLEAR → OK
-    PING  → OK PONG
+기존 IssuanceDevice / EntryDevice 가 분리되어 있던 것을 단일 장치로 통합. 어떤 하드웨어가
+연결되어 있든 (게이트 + NFC 가 있는 Arduino UNO, 또는 ESP32-C3 팔찌 USB-CDC 직결) 동일한
+intent-oriented 명령 집합을 사용한다. 펌웨어가 자기 하드웨어에 맞춰 PASS = 게이트 OPEN,
+DENY = 적색 LED 같은 식으로 implement.
 
-NFC 트리거 없음(이미 BLE 광고 중). signal_pass 는 LED SUCCESS + OLED 표시.
+통합 프로토콜
+    WAKE  → OK          팔찌 BLE 광고 깨우기 (NFC 트리거 또는 noop)
+    PASS  → OK          통과 신호 (게이트 OPEN / LED SUCCESS)
+    DENY  → OK          거부 신호 (게이트 잠금 / LED FAILURE)
+    CLEAR → OK          반납 후처리 (NFC 클리어 / 상태 초기화)
+    PING  → OK PONG     헬스 체크
 """
 from __future__ import annotations
 
@@ -26,9 +29,14 @@ def _sim_response(cmd: str) -> str:
     return "OK"
 
 
-class EntryDevice(IOperatorDevice):
+class OperatorDevice(IOperatorDevice):
+    """단일 운영자 장치. PING 으로 connect 직후 핸드셰이크 검증."""
+
     def __init__(self, baud: int = 115200) -> None:
-        self._t = SerialTransport("ENTRY", baud=baud, sim_response=_sim_response, sim_latency=0.1)
+        self._t = SerialTransport(
+            "OPERATOR", baud=baud,
+            sim_response=_sim_response, sim_latency=0.15,
+        )
 
     @property
     def is_connected(self) -> bool:
@@ -41,10 +49,9 @@ class EntryDevice(IOperatorDevice):
     async def connect(self, port: str) -> bool:
         if not await self._t.connect(port):
             return False
-        # PING 으로 응답 확인 (펌웨어 부팅 직후엔 빈 줄일 수 있음)
         try:
             pong = await self._t.send("PING")
-            log.info("[ENTRY] PING → %r", pong)
+            log.info("[OPERATOR] PING → %r", pong)
         except Exception:
             pass
         return True

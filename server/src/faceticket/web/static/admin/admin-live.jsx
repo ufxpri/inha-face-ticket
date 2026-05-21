@@ -34,7 +34,7 @@ function AdminLive({ t, state }) {
   const btn2En = state.mode === 'issue' ? '② WRISTBAND TAGGED · BLE 기록'
               : state.mode === 'entry' ? '② WRISTBAND TAGGED · 인증 진행'
               : '② WRISTBAND TAGGED · 초기화';
-  const ioReady = !!state.flags.activeDevice;
+  const ioReady = !!state.flags.deviceStatus.connected;
   const btn1Enabled = state.fsmState === 'idle' && ioReady;
   const btn2Enabled = state.fsmState === 'await_tag';
   const focusedSeat = state.mode === 'issue';
@@ -160,25 +160,14 @@ function AdminLive({ t, state }) {
         }}>
           <SectionHeading t={t} num="04" en="DEVICE · 장치 연결" ko="" />
           <div>
-            <DevicePanel t={t} label="발급장치 · ISSUANCE"
-              deviceKey="issuance"
-              status={state.flags.issuanceStatus}
+            <DevicePanel t={t}
+              status={state.flags.deviceStatus}
               ports={state.flags.availablePorts}
-              otherConnected={state.flags.entryStatus.connected}
               busy={state.fsmState !== 'idle'}
               onConnect={state.ioConnect}
               onDisconnect={state.ioDisconnect}
               onRefresh={state.ioRefresh} />
-            <DevicePanel t={t} label="입장장치 · ENTRY"
-              deviceKey="entry"
-              status={state.flags.entryStatus}
-              ports={state.flags.availablePorts}
-              otherConnected={state.flags.issuanceStatus.connected}
-              busy={state.fsmState !== 'idle'}
-              onConnect={state.ioConnect}
-              onDisconnect={state.ioDisconnect}
-              onRefresh={state.ioRefresh} />
-            {!state.flags.activeDevice && (
+            {!state.flags.deviceStatus.connected && (
               <div style={{
                 fontFamily: t.monoFamily, fontSize: 10.5, color: t.accent,
                 letterSpacing: 1.2, marginTop: 4,

@@ -1,13 +1,11 @@
 """운영자 시리얼 장치 포트.
 
-두 구현체 (IssuanceDevice / EntryDevice) 가 동일 시그니처를 만족 — LSP. 어느 쪽이
-연결돼 있든 FlowController 입장에선 동일한 메서드를 호출한다.
+발급/입장 두 장치를 분리했던 구조에서 단일 OperatorDevice 로 통합. 시그니처는 동일하게
+유지 (`wake_wristband / signal_pass / signal_deny / clear_wristband`).
 """
 from __future__ import annotations
 
-from typing import Literal, Optional, Protocol, runtime_checkable
-
-OperatorDeviceKey = Literal["issuance", "entry"]
+from typing import Optional, Protocol, runtime_checkable
 
 
 @runtime_checkable

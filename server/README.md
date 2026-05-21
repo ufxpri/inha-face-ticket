@@ -32,7 +32,7 @@ src/faceticket/
 ├── adapters/
 │   ├── face/              FacenetRecognizer · HashStubRecognizer · factory
 │   ├── ble/               BleakBleCentral · MockBleCentral · BleSwap (명시적 hot-swap)
-│   ├── devices/           SerialTransport · IssuanceDevice · EntryDevice · DeviceRegistry · list_serial_ports
+│   ├── devices/           SerialTransport · OperatorDevice · list_serial_ports
 │   ├── persistence/       SqliteIssueRepository
 │   └── web/               app_factory · lifespan · http_routes · ws_admin · ws_tablet · ws_protocol · presenter · client_pool
 ├── config/                paths · ble_uuids · face_thresholds · led_codes · settings

@@ -67,9 +67,8 @@ class AdminCommand:
     type: str
     seat: str = ""
     name: str = ""
-    layer: str = ""               # toggle 용
+    layer: str = ""               # toggle 용 ("face" | "ble")
     mock: bool = False            # toggle 용
-    device: str = ""              # io_*  용
     port: str = ""                # io_connect 용
 
 
@@ -81,6 +80,5 @@ def parse_admin_message(data: dict) -> AdminCommand:
         name=str(data.get("name", "")).strip(),
         layer=str(data.get("layer", "")),
         mock=bool(data.get("mock", False)),
-        device=str(data.get("device", "")),
         port=str(data.get("port", "")),
     )
