@@ -7,7 +7,7 @@ function AdminLive({ t, state }) {
   } = FT.atoms;
   const {
     ShowStrip, AdminHeader, CapacityGauge, TabletMirror, StageMap,
-    ShowtimeTimeline, DevicePanel, SetlistPanel, LogFeed,
+    ShowtimeTimeline, DevicePanel, LogFeed,
   } = FT.molecules;
 
   const tabs = [
@@ -53,7 +53,7 @@ function AdminLive({ t, state }) {
 
         {/* LEFT — procedure control */}
         <div style={{
-          borderRight: `1px solid ${t.line}`, padding: '20px 22px',
+          borderRight: `1px solid ${t.line}`, padding: '16px 18px',
           background: t.paper, overflow: 'hidden',
         }}>
           <SectionHeading t={t} num="01" en="PROCEDURE" ko="절차 제어" />
@@ -86,23 +86,15 @@ function AdminLive({ t, state }) {
               placeholder="MZ·B / R07·S11 — 비워두면 자동"
               focused={focusedSeat}
               disabled={state.mode !== 'issue' || state.fsmState !== 'idle'} />
-            <FormField t={t} label="구역 · ZONE"
-              value={state.form.zone} onChange={v => state.setFormField('zone', v)}
-              placeholder="ZN.MEZ · MEZZANINE — 비워두면 자동"
-              disabled={state.mode !== 'issue' || state.fsmState !== 'idle'} />
             <FormField t={t} label="관객 이름 · NAME"
               value={state.form.name} onChange={v => state.setFormField('name', v)}
               placeholder="서지윤 — 비워두면 자동"
-              disabled={state.mode !== 'issue' || state.fsmState !== 'idle'} />
-            <FormField t={t} label="티켓 · TICKET ID"
-              value={state.form.ticketId} onChange={v => state.setFormField('ticketId', v)}
-              placeholder="NF-26-0512-0917 — 비워두면 자동"
               disabled={state.mode !== 'issue' || state.fsmState !== 'idle'} />
             {state.mode === 'issue' && state.fsmState === 'idle' && (
               <div style={{
                 fontFamily: t.monoFamily, fontSize: 10.5, color: t.mute,
                 letterSpacing: 1.2, marginTop: -4, marginBottom: 6,
-              }}>비어 있는 칸은 START 시 무작위 데모값으로 채워집니다.</div>
+              }}>비어 있는 칸은 START 시 자동으로 채워집니다.</div>
             )}
           </div>
 
@@ -160,11 +152,11 @@ function AdminLive({ t, state }) {
           </div>
         </div>
 
-        {/* RIGHT — device / setlist / log */}
+        {/* RIGHT — device / log (셋리스트는 태블릿용이라 admin 에선 생략) */}
         <div style={{
-          borderLeft: `1px solid ${t.line}`, padding: '20px 22px',
-          background: t.paper, display: 'flex', flexDirection: 'column', gap: 14,
-          overflow: 'hidden',
+          borderLeft: `1px solid ${t.line}`, padding: '16px 18px',
+          background: t.paper, display: 'flex', flexDirection: 'column', gap: 12,
+          overflow: 'hidden', minHeight: 0,
         }}>
           <SectionHeading t={t} num="04" en="DEVICE · 장치 연결" ko="" />
           <div>
@@ -194,10 +186,7 @@ function AdminLive({ t, state }) {
             )}
           </div>
 
-          <SectionHeading t={t} num="05" en="SETLIST · 셋리스트" ko="" />
-          <SetlistPanel t={t} current={-1} />
-
-          <SectionHeading t={t} num="06" en="LOG · 실시간 로그" ko="" />
+          <SectionHeading t={t} num="05" en="LOG · 실시간 로그" ko="" />
           <LogFeed t={t} entries={state.log} />
         </div>
       </div>

@@ -5,10 +5,10 @@ function LogFeed({ t, entries }) {
   return (
     <div style={{
       flex: 1, background: t.ink, color: t.paper,
-      padding: '12px 14px',
-      fontFamily: t.monoFamily, fontSize: 12.5, lineHeight: 1.55,
+      padding: '10px 12px',
+      fontFamily: t.monoFamily, fontSize: 12, lineHeight: 1.5,
       overflowY: 'auto', letterSpacing: 0.3,
-      minHeight: 220, maxHeight: 460,
+      minHeight: 180, maxHeight: 360,
     }}>
       {entries.length === 0 ? (
         <div style={{ color: t.mute, opacity: 0.7 }}>— awaiting events —</div>
