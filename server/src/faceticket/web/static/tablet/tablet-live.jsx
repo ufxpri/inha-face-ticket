@@ -1,19 +1,23 @@
 window.FT = window.FT || {};
 FT.tablet = FT.tablet || {};
 
-// 얼굴 영역은 view 전이에서 절대 흔들리지 않는다. 위/아래 슬롯이 고정 height 를 갖고
-// 그 안의 콘텐츠만 opacity 로 페이드. capturing 시 카운트다운 숫자는 얼굴 위에 오버레이.
-const HERO_SIZE       = 480;
-const HERO_FACE_RATIO = 0.50;
-const HINT_SLOT_H     = 130;   // capture title or empty
-const INFO_SLOT_H     = 580;   // ResultCard / IdleCallout+StageMap+SetlistPanel
-const COUNTDOWN_SLOT_H = 110;   // 3 countdowns visible only on idle, reserved on others
+// 카메라 + 임베딩 영역은 "배경" 으로 취급 — 한 번 자리잡으면 view 전이에서 절대 흔들리지 않고
+// 크기/위치 유지. 모든 가변 텍스트(타이틀, 카운트다운, 상태 칩, 결과 카드)는 그 위 또는 별도
+// 섹션에 오버레이/페이드.
+//
+// 섹션 구분:
+//   [chip row]    상태/메타 — 위에 한 줄
+//   [camera zone] 고정 height. HeroFace + 가변 오버레이(타이틀, 카운트다운). 안쪽 침범 불가.
+//   [info zone]   flex 1. IdleCallout ↔ ResultCard 페이드. camera zone 을 침범 못 함.
+const HERO_SIZE        = 580;
+const HERO_FACE_RATIO  = 0.62;
+const CAMERA_ZONE_H    = 680;   // hero 580 + 라벨 위/아래 마진 + 약간의 호흡
 
 function TabletLive({ t, view, seq, subj, videoRef, countdown, footer, cosineThreshold }) {
-  const { StatusChip, MonoLine, ShowCountdown, FadeSlot } = FT.atoms;
+  const { StatusChip, MonoLine, FadeSlot } = FT.atoms;
   const {
     TicketStub, ShowStrip, TabletHeader, TabletFooter, IdleCallout,
-    HeroFace, StageMap, SetlistPanel, ResultCard,
+    HeroFace, ResultCard,
   } = FT.molecules;
 
   const isIdle      = view === 'idle';
@@ -28,7 +32,6 @@ function TabletLive({ t, view, seq, subj, videoRef, countdown, footer, cosineThr
                    : (isPassIssue || view === 'capturing-issue') ? 'issue'
                    : isDeny ? 'deny' : 'pass';
 
-  // status / chip 텍스트는 한 곳에서만 결정
   const chipKind = isIdle ? 'idle' : isDeny ? 'deny' : isCapturing ? 'scan' : 'pass';
   const chipText = isIdle ? 'STANDBY · 입장 대기 / WAITING'
                  : view === 'capturing-issue' ? '얼굴 캡처 중 · CAPTURING (ISSUE)'
@@ -38,14 +41,11 @@ function TabletLive({ t, view, seq, subj, videoRef, countdown, footer, cosineThr
                  : isPassEntry ? '입장 허가 · ACCESS GRANTED'
                  : '입장 거부 · ACCESS DENIED';
 
-  // HeroFace 의 status / confidence 만 바뀌고 size 는 절대 바뀌지 않는다.
   const heroStatus = isIdle ? 'idle' : isDeny ? 'deny' : isCapturing ? 'scan' : 'pass';
   const confidence = isIdle ? 0
                    : isCapturing ? 0.55
                    : isDeny ? 0.41
                    : isAwaitTag ? 0.86 : 0.96;
-  // 결과 view 에서만 ResultCard 안에 임베딩을 보여준다. capturing 시에는 RadialViz 가
-  // status='scan' 으로 자체 시각화하므로 굳이 embedding 까지 흘릴 필요 없음.
   const heroEmbedding = isResult ? subj.embedding : null;
 
   return (
@@ -61,11 +61,14 @@ function TabletLive({ t, view, seq, subj, videoRef, countdown, footer, cosineThr
         <ShowStrip t={t} />
 
         <div style={{
-          flex: 1, padding: '22px 36px 18px',
-          display: 'flex', flexDirection: 'column', gap: 14, minHeight: 0,
+          flex: 1, padding: '20px 36px 18px',
+          display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0,
         }}>
-          {/* 상태 칩 + 메타 — 텍스트만 바뀜, 박스 자체는 항상 같은 자리 */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+          {/* ── 상태 칩 + 메타 ───────────────────────────────────── */}
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            flexShrink: 0,
+          }}>
             <StatusChip t={t} kind={chipKind}>{chipText}</StatusChip>
             <div style={{ display: 'flex', gap: 14 }}>
               <MonoLine t={t} letter={1.5}>ML · facenet-pytorch v1.3</MonoLine>
@@ -73,72 +76,70 @@ function TabletLive({ t, view, seq, subj, videoRef, countdown, footer, cosineThr
             </div>
           </div>
 
-          {/* 3개 카운트다운 — idle 일 때만 보이지만 슬롯은 항상 예약 */}
-          <FadeSlot height={COUNTDOWN_SLOT_H}>
-            <FadeSlot.Item show={isIdle}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-                <ShowCountdown t={t} label="DOORS · 입장 개시" time="19:00" />
-                <ShowCountdown t={t} label="SHOW · 공연 시작 T-MINUS" time="00:47:00" accent />
-                <ShowCountdown t={t} label="ENCORE · 앙코르 예상" time="22:10" />
-              </div>
-            </FadeSlot.Item>
-          </FadeSlot>
-
-          {/* 힌트 슬롯 — capturing 일 때만 “정면을 바라봐 주세요” 타이틀 */}
-          <FadeSlot height={HINT_SLOT_H - 30}>
-            <FadeSlot.Item show={isCapturing}>
-              <div style={{
-                fontFamily: t.sansFamily, fontSize: 40, fontWeight: 700, color: t.ink,
-                letterSpacing: -0.8, textAlign: 'center',
-              }}>정면을 바라봐 주세요</div>
-              <div style={{
-                fontFamily: t.monoFamily, fontSize: 13, color: t.mute, letterSpacing: 2,
-                textAlign: 'center', marginTop: 6,
-              }}>LOOK STRAIGHT AT THE CAMERA · 3 SECONDS</div>
-            </FadeSlot.Item>
-          </FadeSlot>
-
-          {/* 얼굴 영역 — 절대 흔들리지 않음 */}
+          {/* ── 카메라 ZONE — 배경처럼 고정, 위 점선으로 경계 ───── */}
           <div style={{
-            flexShrink: 0, position: 'relative',
-            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            flexShrink: 0,
+            height: CAMERA_ZONE_H,
+            position: 'relative',
+            borderTop: `1px dashed ${t.line2}`,
+            borderBottom: `1px dashed ${t.line2}`,
+            display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
           }}>
+            {/* HeroFace — 자리 고정, view 전이에도 동일 props 그대로 */}
             <HeroFace t={t} source="video" status={heroStatus}
                       size={HERO_SIZE} faceRatio={HERO_FACE_RATIO}
                       videoRef={videoRef} embedding={heroEmbedding}
                       confidence={confidence} embDim={512} />
 
-            {/* 카운트다운 숫자 오버레이 — 얼굴 위에 떠 있음. transition 으로 등장/소멸 부드럽게 */}
+            {/* 카메라 ZONE 상단에 떠 있는 가이드 오버레이 — 카메라를 건드리지 않음 */}
+            <div style={{
+              position: 'absolute', top: 22, left: 0, right: 0,
+              textAlign: 'center', pointerEvents: 'none',
+              opacity: isCapturing ? 1 : 0,
+              transition: 'opacity 240ms ease',
+            }}>
+              <div style={{
+                display: 'inline-block', padding: '8px 18px',
+                background: 'rgba(15,17,11,0.92)',
+                color: t.paper, fontFamily: t.sansFamily,
+                fontSize: 22, fontWeight: 600, letterSpacing: -0.3,
+              }}>
+                정면을 바라봐 주세요
+                <span style={{
+                  marginLeft: 12, fontFamily: t.monoFamily, fontSize: 11,
+                  letterSpacing: 1.8, opacity: 0.6, fontWeight: 400,
+                }}>LOOK STRAIGHT · 3s</span>
+              </div>
+            </div>
+
+            {/* 카운트다운 숫자 오버레이 — 얼굴 위 정중앙 */}
             <div style={{
               position: 'absolute', left: '50%', top: '50%',
               transform: 'translate(-50%, -50%)',
               fontFamily: t.sansFamily, fontWeight: 800,
-              fontSize: 220, lineHeight: 1, color: '#fff',
+              fontSize: 240, lineHeight: 1, color: '#fff',
               textShadow: '0 4px 24px rgba(0,0,0,0.5)',
-              opacity: isCapturing && countdown > 0 ? 0.92 : 0,
+              opacity: isCapturing && countdown > 0 ? 0.95 : 0,
               transition: 'opacity 220ms ease',
               pointerEvents: 'none', userSelect: 'none',
             }}>{countdown || ''}</div>
           </div>
 
-          {/* 정보 슬롯 — idle 의 IdleCallout+StageMap+SetlistPanel 와 결과 ResultCard 가 교대 */}
-          <FadeSlot height={INFO_SLOT_H} style={{ marginTop: 8 }}>
-            <FadeSlot.Item show={isIdle}>
+          {/* ── 정보 ZONE — 별도 섹션, 카메라 침범 불가 ───────── */}
+          <div style={{
+            flex: 1, position: 'relative', minHeight: 0,
+          }}>
+            <FadeSlot.Item show={isIdle} style={{ justifyContent: 'flex-start', padding: '4px 0' }}>
               <IdleCallout t={t} />
-              <div style={{
-                display: 'grid', gridTemplateColumns: '1.1fr 1fr', gap: 14, marginTop: 14,
-              }}>
-                <StageMap t={t} highlightSection="FL-A" highlightSeat={[12, 3]} />
-                <SetlistPanel t={t} current={-1} compact />
-              </div>
             </FadeSlot.Item>
-            <FadeSlot.Item show={isResult} style={{ justifyContent: 'flex-start' }}>
+            <FadeSlot.Item show={isResult} style={{ justifyContent: 'flex-start', padding: '4px 0' }}>
               <ResultCard t={t} kind={view} subj={subj}
                           cosVal={isPassEntry ? subj.cos : (isDeny ? subj.cos : null)}
                           fadedCos={isAwaitTag || isPassIssue}
                           threshold={cosineThreshold} />
             </FadeSlot.Item>
-          </FadeSlot>
+          </div>
         </div>
 
         <TabletFooter t={t} lines={footer} />
