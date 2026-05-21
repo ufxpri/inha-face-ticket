@@ -21,6 +21,9 @@ function ResultCard({ t, kind, subj, cosVal, fadedCos, threshold }) {
                     stampBg: t.ink, stampFg: t.paper },
   }[kind];
 
+  // kind 가 result view 가 아닌 경우 (FadeSlot 안에서 show=false 로 잠시 머무는 동안) — 빈 자리만 차지
+  if (!conf) return <div />;
+
   return (
     <div style={{
       border: `1px solid ${t.ink}`, background: t.surface,

@@ -24,24 +24,11 @@ function TabletApp() {
 
   return (
     <FT.lib.Scaler width={1080} height={1440}>
-      <div style={{ position: 'relative', width: 1080, height: 1440 }}>
-        <FT.tablet.TabletLive t={t} view={s.view} seq={s.seq} subj={subj}
-                              videoRef={s.videoRef} footer={footer}
-                              cosineThreshold={s.cosineThreshold} />
-        {s.countdown > 0 && (
-          <div style={{
-            position: 'absolute', inset: 0, display: 'flex',
-            alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(15,17,11,0.35)', pointerEvents: 'none', zIndex: 50,
-          }}>
-            <div style={{
-              fontFamily: t.monoFamily, fontWeight: 200, fontSize: 320,
-              color: t.paper, textShadow: '0 0 80px rgba(216,58,31,0.5)',
-              letterSpacing: -10,
-            }}>{s.countdown}</div>
-          </div>
-        )}
-      </div>
+      <FT.tablet.TabletLive
+        t={t} view={s.view} seq={s.seq} subj={subj}
+        videoRef={s.videoRef} countdown={s.countdown}
+        footer={footer} cosineThreshold={s.cosineThreshold}
+      />
     </FT.lib.Scaler>
   );
 }
