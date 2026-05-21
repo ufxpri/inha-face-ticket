@@ -1,7 +1,7 @@
 window.FT = window.FT || {};
 FT.molecules = FT.molecules || {};
 
-// ResultCard — pass-issue / pass-entry / deny / issue-await-tag stamp + ID panel.
+// ResultCard — pass-issue / pass-entry / deny / awaiting-issue stamp + ID panel.
 function ResultCard({ t, kind, subj, cosVal, fadedCos, threshold }) {
   const { KV, ZoneBadge } = FT.atoms;
   const ZONES = FT.data.ZONES;
@@ -19,7 +19,7 @@ function ResultCard({ t, kind, subj, cosVal, fadedCos, threshold }) {
     'deny':       { title: '본인 확인 실패', titleEn: 'IDENTITY MISMATCH', stamp: 'DENY',
                     sub: '얼굴 임베딩이 발급 시 등록과 일치하지 않습니다. 1층 매표소에서 본인 확인 후 재발급 받으세요.',
                     stampBg: t.accent, stampFg: t.accentInk },
-    'issue-await-tag': { title: '팔찌 태그 대기', titleEn: 'AWAITING WRISTBAND TAG', stamp: 'WAIT',
+    'awaiting-issue': { title: '팔찌 태그 대기', titleEn: 'AWAITING WRISTBAND TAG', stamp: 'WAIT',
                     sub: '얼굴 임베딩 추출이 완료되었습니다. 발급 장치의 NFC 리더에 팔찌를 가까이 대주세요.',
                     stampBg: t.ink, stampFg: t.paper },
   }[kind];

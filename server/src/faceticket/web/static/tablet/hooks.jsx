@@ -108,7 +108,7 @@ function useAudioUnlock() {
 // (tick 은 타이머 기반이라 useCountdownAndCapture 안에 남김. captureFail 은
 //  view 가 바뀌지 않고 silent retry 라 WS handler 안에 직접 둠.)
 const VIEW_ENTRY_SOUND = {
-  'issue-await-tag': 'captureOk',  // 발급 캡처 성공 시 await_tag 로 전이
+  'awaiting-issue': 'captureOk',  // 발급 캡처 성공 시 awaiting-issue 로 전이
   'pass-issue':      'chimePass',
   'pass-entry':      'chimePass',
   'pass-return':     'chimeReturn',
@@ -162,7 +162,7 @@ function useTabletViewState() {
           if (m.embedding) setEmbedding(m.embedding);
           // ISSUE 만 view 가 바뀌어 captureOk 사운드를 useViewSounds 가 처리.
           // ENTRY 는 view 가 안 바뀌어 사운드를 위해 명시 호출.
-          if (lastFlowRef.current === 'issue') setView('issue-await-tag');
+          if (lastFlowRef.current === 'issue') setView('awaiting-issue');
           else                                 _snd('captureOk');
         } else {
           _snd('captureFail');  // view 가 안 바뀜 (자동 재시도)

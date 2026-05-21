@@ -13,15 +13,21 @@ function LogFeed({ t, entries }) {
       {entries.length === 0 ? (
         <div style={{ color: t.mute, opacity: 0.7 }}>— awaiting events —</div>
       ) : entries.slice().reverse().map((entry, i) => {
-        const col = entry.level === 'warn' ? t.accent
-                  : entry.level === 'error' ? t.accent : t.paper;
+        const isErr  = entry.level === 'error';
+        const isWarn = entry.level === 'warn';
+        const col = isErr ? t.danger : isWarn ? t.accent : t.paper;
+        const tag = isErr ? 'E' : isWarn ? 'W' : 'I';
         return (
           <div key={i} style={{ display: 'flex', gap: 10 }}>
             <span style={{ color: t.mute, flexShrink: 0 }}>{entry.ts}</span>
-            <span style={{ color: col, width: 10, flexShrink: 0 }}>
-              {entry.level === 'warn' ? 'W' : entry.level === 'error' ? 'E' : 'I'}
-            </span>
-            <span style={{ color: col, wordBreak: 'break-word' }}>{entry.msg}</span>
+            <span style={{
+              color: col, width: 10, flexShrink: 0,
+              fontWeight: isErr ? 700 : 400,
+            }}>{tag}</span>
+            <span style={{
+              color: col, wordBreak: 'break-word',
+              fontWeight: isErr ? 600 : 400,
+            }}>{entry.msg}</span>
           </div>
         );
       })}

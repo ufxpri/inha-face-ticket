@@ -13,7 +13,8 @@ const THEME_A = {
   mute:     '#857c6c',
   line:     '#cabea6',
   line2:    '#e2d8c2',
-  accent:   '#d83a1f',
+  accent:   '#d83a1f',     // warn / 부드러운 강조 (오렌지-레드)
+  danger:   '#a01010',     // error / 위험 (어두운 진홍)
   accentInk:'#ffffff',
   ok:       '#15110b',
   sansFamily: '"IBM Plex Sans KR", "IBM Plex Sans", sans-serif',

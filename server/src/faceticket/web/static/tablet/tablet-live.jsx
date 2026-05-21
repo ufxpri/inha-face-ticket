@@ -22,7 +22,7 @@ const VIEW_META = {
   'idle':            { chipKind: 'idle', heroStatus: 'idle', headerMode: 'idle',  confidence: 0,    isResult: false, chipText: 'STANDBY · 입장 대기 / WAITING' },
   'capturing-issue': { chipKind: 'scan', heroStatus: 'scan', headerMode: 'issue', confidence: 0.55, isResult: false, chipText: '얼굴 캡처 중 · CAPTURING (ISSUE)' },
   'capturing-entry': { chipKind: 'scan', heroStatus: 'scan', headerMode: 'pass',  confidence: 0.55, isResult: false, chipText: '얼굴 캡처 중 · CAPTURING (ENTRY)' },
-  'issue-await-tag': { chipKind: 'pass', heroStatus: 'pass', headerMode: 'pass',  confidence: 0.86, isResult: true,  chipText: '팔찌 태그 대기 · AWAITING WRISTBAND' },
+  'awaiting-issue': { chipKind: 'pass', heroStatus: 'pass', headerMode: 'pass',  confidence: 0.86, isResult: true,  chipText: '팔찌 태그 대기 · AWAITING WRISTBAND' },
   'pass-issue':      { chipKind: 'pass', heroStatus: 'pass', headerMode: 'issue', confidence: 0.96, isResult: true,  chipText: '발급 완료 · WRISTBAND ISSUED' },
   'pass-entry':      { chipKind: 'pass', heroStatus: 'pass', headerMode: 'pass',  confidence: 0.96, isResult: true,  chipText: '입장 허가 · ACCESS GRANTED' },
   'pass-return':     { chipKind: 'pass', heroStatus: 'pass', headerMode: 'pass',  confidence: 0.96, isResult: true,  chipText: '반납 완료 · WRISTBAND RETURNED' },
@@ -41,7 +41,7 @@ function TabletLive({ t, view, seq, subj, videoRef, countdown, footer, cosineThr
   const isCapturing  = view === 'capturing-issue' || view === 'capturing-entry';
   const isPassEntry  = view === 'pass-entry';
   const isPassIssue  = view === 'pass-issue';
-  const isAwaitTag   = view === 'issue-await-tag';
+  const isAwaitTag   = view === 'awaiting-issue';
   const isDeny       = view === 'deny';
   const heroEmbedding = meta.isResult ? subj.embedding : null;
 
