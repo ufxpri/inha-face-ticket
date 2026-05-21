@@ -20,13 +20,14 @@ function TabletLive({ t, view, seq, subj, videoRef, countdown, footer, cosineThr
     HeroFace, ResultCard,
   } = FT.molecules;
 
-  const isIdle      = view === 'idle';
-  const isCapturing = view === 'capturing-issue' || view === 'capturing-entry';
-  const isAwaitTag  = view === 'issue-await-tag';
-  const isPassIssue = view === 'pass-issue';
-  const isPassEntry = view === 'pass-entry';
-  const isDeny      = view === 'deny';
-  const isResult    = isAwaitTag || isPassIssue || isPassEntry || isDeny;
+  const isIdle       = view === 'idle';
+  const isCapturing  = view === 'capturing-issue' || view === 'capturing-entry';
+  const isAwaitTag   = view === 'issue-await-tag';
+  const isPassIssue  = view === 'pass-issue';
+  const isPassEntry  = view === 'pass-entry';
+  const isPassReturn = view === 'pass-return';
+  const isDeny       = view === 'deny';
+  const isResult     = isAwaitTag || isPassIssue || isPassEntry || isPassReturn || isDeny;
 
   const headerMode = isIdle ? 'idle'
                    : (isPassIssue || view === 'capturing-issue') ? 'issue'
@@ -39,6 +40,7 @@ function TabletLive({ t, view, seq, subj, videoRef, countdown, footer, cosineThr
                  : isAwaitTag ? '팔찌 태그 대기 · AWAITING WRISTBAND'
                  : isPassIssue ? '발급 완료 · WRISTBAND ISSUED'
                  : isPassEntry ? '입장 허가 · ACCESS GRANTED'
+                 : isPassReturn ? '반납 완료 · WRISTBAND RETURNED'
                  : '입장 거부 · ACCESS DENIED';
 
   const heroStatus = isIdle ? 'idle' : isDeny ? 'deny' : isCapturing ? 'scan' : 'pass';

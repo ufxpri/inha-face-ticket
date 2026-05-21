@@ -57,6 +57,7 @@ class FlowRunner:
         outcome = await self._safe_outcome(self.issue.on_tag(), IssueOutcome(False, reason="내부 오류"))
         if outcome.ok:
             await self.presenter.emit_complete(True, "발급 완료",
+                                               flow=Flow.ISSUE.value,
                                                wristband_id=outcome.wristband_id,
                                                seat=outcome.seat)
             await self._mark_done(wristband_id=outcome.wristband_id, seat=outcome.seat)
@@ -88,6 +89,7 @@ class FlowRunner:
         outcome = await self._safe_outcome(self.return_.on_tag(), ReturnOutcome(False, reason="내부 오류"))
         if outcome.ok:
             await self.presenter.emit_complete(True, "반납 완료",
+                                               flow=Flow.RETURN.value,
                                                wristband_id=outcome.wristband_id,
                                                returned=outcome.returned)
             await self._mark_done(wristband_id=outcome.wristband_id, returned=outcome.returned)
@@ -104,6 +106,7 @@ class FlowRunner:
                 EntryFaceResult(False, 0.0, "내부 오류"),
             )
             await self.presenter.emit_complete(result.passed, result.message,
+                                               flow=Flow.ENTRY.value,
                                                similarity=result.similarity)
             await self._mark_done(similarity=result.similarity, passed=result.passed)
 

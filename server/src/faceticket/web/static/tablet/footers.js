@@ -43,3 +43,10 @@ FT.tablet.FOOTERS = {
   ],
 };
 FT.tablet.FOOTERS['capturing-entry'] = FT.tablet.FOOTERS['capturing-issue'];
+
+FT.tablet.FOOTERS['pass-return'] = ({ subj }) => [
+  { l: 'NFC.READER',  r: 'CLEAR → OK 14 ms' },
+  { l: 'BLE.CENTRAL', r: 'PAIRED · embedding zero·write 21.4 kB · OK', accent: true },
+  { l: 'WRIST.ID',    r: subj.wristId + ' · session closed' },
+  { l: 'LED.PRESET',  r: 'pulse.amber → return · OK' },
+];

@@ -107,8 +107,13 @@ function useTabletViewState() {
           setTimeout(runCountdownAndCapture, 900);
         }
       } else if (m.type === 'complete') {
+        // 서버가 동봉한 flow 로 결과 view 분기. (반납은 capture_trigger 가 없어
+        // lastFlowRef 만으로는 알 수 없으므로 m.flow 가 정답.)
+        const completedFlow = m.flow || lastFlowRef.current;
         if (m.ok) {
-          setView(lastFlowRef.current === 'entry' ? 'pass-entry' : 'pass-issue');
+          setView(completedFlow === 'entry'  ? 'pass-entry'
+                : completedFlow === 'return' ? 'pass-return'
+                                              : 'pass-issue');
         } else {
           setView('deny');
         }
