@@ -13,7 +13,7 @@ const HERO_SIZE        = 580;
 const HERO_FACE_RATIO  = 0.62;
 const CAMERA_ZONE_H    = 680;   // hero 580 + 라벨 위/아래 마진 + 약간의 호흡
 
-function TabletLive({ t, view, seq, subj, videoRef, countdown, footer, cosineThreshold }) {
+function TabletLive({ t, view, seq, subj, videoRef, countdown, footer, cosineThreshold, audioReady }) {
   const { StatusChip, MonoLine, FadeSlot } = FT.atoms;
   const {
     TicketStub, ShowStrip, TabletHeader, TabletFooter, IdleCallout,
@@ -126,6 +126,17 @@ function TabletLive({ t, view, seq, subj, videoRef, countdown, footer, cosineThr
               transition: 'opacity 220ms ease',
               pointerEvents: 'none', userSelect: 'none',
             }}>{countdown || ''}</div>
+
+            {/* 사운드 활성화 힌트 — idle 상태 + 아직 미활성화일 때만, 카메라 zone 하단 우측 */}
+            {isIdle && !audioReady && (
+              <div style={{
+                position: 'absolute', right: 18, bottom: 14,
+                padding: '7px 12px',
+                background: 'rgba(15,17,11,0.85)', color: t.paper,
+                fontFamily: t.monoFamily, fontSize: 11, letterSpacing: 1.5,
+                pointerEvents: 'none',
+              }}>♪ 화면을 한 번 터치하여 사운드 활성화</div>
+            )}
           </div>
 
           {/* ── 정보 ZONE — 별도 섹션, 카메라 침범 불가 ───────── */}

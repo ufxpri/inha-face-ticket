@@ -59,13 +59,37 @@ function useCountdownAndCapture({ videoRef, wsRef }) {
   }, [videoRef, wsRef]);
 
   const runCountdownAndCapture = _tc(() => {
-    setCountdown(3);
-    setTimeout(() => setCountdown(2), 700);
-    setTimeout(() => setCountdown(1), 1400);
+    const tick = () => { if (window.FT && FT.sounds) FT.sounds.tick(); };
+    setCountdown(3);                                 tick();
+    setTimeout(() => { setCountdown(2);              tick(); }, 700);
+    setTimeout(() => { setCountdown(1);              tick(); }, 1400);
     setTimeout(() => { setCountdown(0); sendCapture(); }, 2100);
   }, [sendCapture]);
 
   return { countdown, runCountdownAndCapture };
+}
+
+// useAudioUnlock — 브라우저 자동재생 정책 우회. 첫 user gesture(click/touch/key) 시
+// AudioContext 를 초기화+resume. 사운드가 활성화되면 audioReady=true.
+function useAudioUnlock() {
+  const [audioReady, setAudioReady] = _ts(false);
+  _te(() => {
+    const unlock = () => {
+      if (!window.FT || !FT.sounds) return;
+      FT.sounds.init();
+      setAudioReady(FT.sounds.ready);
+    };
+    const opts = { capture: true };
+    window.addEventListener('click', unlock, opts);
+    window.addEventListener('touchstart', unlock, opts);
+    window.addEventListener('keydown', unlock, opts);
+    return () => {
+      window.removeEventListener('click', unlock, opts);
+      window.removeEventListener('touchstart', unlock, opts);
+      window.removeEventListener('keydown', unlock, opts);
+    };
+  }, []);
+  return audioReady;
 }
 
 // useTabletViewState — owns the kiosk's WS subscription + view transitions.
@@ -78,6 +102,7 @@ function useTabletViewState() {
   const [cosineThreshold, setCosineThreshold] = _ts(0.55);
   const lastFlowRef = _tr(null);
   const wsRef = _tr(null);
+  const audioReady = useAudioUnlock();
   const { videoRef } = useCamera({ viewKey: view });
   const { countdown, runCountdownAndCapture } = useCountdownAndCapture({ videoRef, wsRef });
 
@@ -100,22 +125,28 @@ function useTabletViewState() {
       } else if (m.type === 'capture_result') {
         if (m.ok) {
           if (m.embedding) setEmbedding(m.embedding);
+          if (window.FT && FT.sounds) FT.sounds.captureOk();
           // ISSUE: server holds at await_tag; we show the wait card.
           // ENTRY: server compares + sends `complete`, so the capture view stays.
           if (lastFlowRef.current === 'issue') setView('issue-await-tag');
         } else {
+          if (window.FT && FT.sounds) FT.sounds.captureFail();
           setTimeout(runCountdownAndCapture, 900);
         }
       } else if (m.type === 'complete') {
-        // 서버가 동봉한 flow 로 결과 view 분기. (반납은 capture_trigger 가 없어
-        // lastFlowRef 만으로는 알 수 없으므로 m.flow 가 정답.)
+        // 서버가 동봉한 flow 로 결과 view 분기.
         const completedFlow = m.flow || lastFlowRef.current;
         if (m.ok) {
           setView(completedFlow === 'entry'  ? 'pass-entry'
                 : completedFlow === 'return' ? 'pass-return'
                                               : 'pass-issue');
+          if (window.FT && FT.sounds) {
+            if (completedFlow === 'return') FT.sounds.chimeReturn();
+            else                            FT.sounds.chimePass();
+          }
         } else {
           setView('deny');
+          if (window.FT && FT.sounds) FT.sounds.buzzDeny();
         }
         setTimeout(() => {
           setView('idle');
@@ -129,9 +160,11 @@ function useTabletViewState() {
 
   return {
     view, seatInput, nameInput, embedding, seq, cosineThreshold, countdown, videoRef,
+    audioReady,
   };
 }
 
 FT.hooks.useCamera = useCamera;
 FT.hooks.useCountdownAndCapture = useCountdownAndCapture;
 FT.hooks.useTabletViewState = useTabletViewState;
+FT.hooks.useAudioUnlock = useAudioUnlock;

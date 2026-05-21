@@ -28,6 +28,7 @@ function TabletApp() {
         t={t} view={s.view} seq={s.seq} subj={subj}
         videoRef={s.videoRef} countdown={s.countdown}
         footer={footer} cosineThreshold={s.cosineThreshold}
+        audioReady={s.audioReady}
       />
     </FT.lib.Scaler>
   );
