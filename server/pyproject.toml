@@ -29,9 +29,6 @@ dev = [
     "ruff>=0.5",
 ]
 
-[project.scripts]
-faceticket = "faceticket.cli:main"
-
 [tool.setuptools.packages.find]
 where = ["src"]
 
