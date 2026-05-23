@@ -4,7 +4,10 @@ from faceticket.config.ble_uuids import (
 )
 from faceticket.config.face_thresholds import COSINE_THRESHOLD, EMBED_DIM, FRONTAL
 from faceticket.config.led_codes import LED_OFF, LED_SUCCESS, LED_FAILURE, LED_ISSUED
-from faceticket.config.paths import APP_DIR, DB_PATH, STATIC_DIR, TEMPLATES_DIR
+from faceticket.config.paths import (
+    APP_DIR, DB_PATH, STATIC_DIR, TEMPLATES_DIR,
+    CERTS_DIR, DEFAULT_SSL_CERT, DEFAULT_SSL_KEY,
+)
 from faceticket.config.settings import Settings, load_settings
 
 __all__ = [
@@ -13,5 +16,6 @@ __all__ = [
     "COSINE_THRESHOLD", "EMBED_DIM", "FRONTAL",
     "LED_OFF", "LED_SUCCESS", "LED_FAILURE", "LED_ISSUED",
     "APP_DIR", "DB_PATH", "STATIC_DIR", "TEMPLATES_DIR",
+    "CERTS_DIR", "DEFAULT_SSL_CERT", "DEFAULT_SSL_KEY",
     "Settings", "load_settings",
 ]

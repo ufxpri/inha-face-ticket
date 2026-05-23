@@ -5,6 +5,7 @@ numpy>=1.24
 Pillow>=10.0
 pyserial>=3.5
 bleak>=0.21
+cryptography>=42       # 자체 서명 TLS 인증서 자동 생성용 (bleak 도 내부적으로 의존)
 
 # 얼굴 임베딩 (PyTorch 기반). 미설치 시 face.py 가 자동 stub 모드로 폴백.
 # CPU 만 사용해도 InceptionResnetV1 한 장 추론 ≈ 수십~수백 ms 라 충분.

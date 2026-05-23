@@ -6,15 +6,14 @@
 
 ```bash
 cd server
-python -m venv .venv && source .venv/bin/activate
-pip install -e .              # pyproject.toml 사용
-# 또는 ML 모델까지:
-pip install -e ".[ml,dev]"
+python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 
-faceticket --host 0.0.0.0 --port 8000
-# 또는
-python -m faceticket
+python run.py
 ```
+
+`run.py` 가 `src/` 를 `sys.path` 에 얹어 패키지 설치 없이 바로 부팅한다.
+호스트/포트/SSL 등 모든 설정은 환경변수 (`FT_HOST`, `FT_PORT`, `FT_SSL`, ...).
 
 환경변수: `FT_HOST`, `FT_PORT`, `FT_ISSUANCE_PORT`, `FT_ENTRY_PORT`, `FT_BLE_MOCK`, `FT_FACE_STUB`.
 

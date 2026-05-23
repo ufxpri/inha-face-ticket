@@ -48,15 +48,22 @@
 
 ```bash
 cd server
-python -m venv .venv && source .venv/bin/activate
-pip install -e .                    # 또는 pip install -e ".[ml,dev]" — 실제 얼굴 모델 포함
-faceticket --port 8000              # 또는 python -m faceticket
+python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt                       # 실제 얼굴 모델까지 한 번에
+python run.py                                         # 설정은 아래 환경변수만 사용
 ```
 
-- 운영자 페이지: <http://localhost:8000/admin>
-- 태블릿 페이지: <http://<노트북IP>:8000/tablet> (카메라 권한 필요 — `localhost` 또는 HTTPS)
+> 헬퍼: `scripts/run-dev.sh` (bash) 또는 `scripts/run-dev.ps1` (PowerShell) 가 venv 생성 + 의존성 설치 + 실행을 한 번에 처리.
 
-설정은 환경변수: `FT_HOST`, `FT_PORT`, `FT_BLE_MOCK`, `FT_FACE_STUB`, `FT_OPERATOR_PORT`, `FT_SERIAL_BAUD`.
+- 운영자 페이지: <https://localhost:8000/admin>
+- 태블릿 페이지: <https://<노트북IP>:8000/tablet> (카메라 권한 필요 — `localhost` 또는 HTTPS)
+
+> HTTPS 는 기본 활성. 최초 실행 시 `server/certs/server.{crt,key}` 가 호스트의 모든 LAN IP 를
+> SAN 에 포함한 자체 서명 인증서로 자동 생성된다. 태블릿에서 처음 접속할 때 "안전하지 않음"
+> 경고를 한 번 수락하면 된다. 평문 HTTP 로 띄우려면 `--no-ssl` 또는 `FT_SSL=0`.
+
+설정은 환경변수: `FT_HOST`, `FT_PORT`, `FT_BLE_MOCK`, `FT_FACE_STUB`, `FT_OPERATOR_PORT`,
+`FT_SERIAL_BAUD`, `FT_SSL` (기본 1), `FT_SSL_CERT`, `FT_SSL_KEY`.
 
 ## 펌웨어 빌드
 

@@ -50,6 +50,12 @@ class Settings:
     # 얼굴 — True 면 ML 모델이 있어도 stub 임베딩
     face_force_stub: bool = False
 
+    # TLS — 태블릿이 LAN IP 로 카메라(getUserMedia) 를 쓰려면 HTTPS 가 필요.
+    # ssl_enabled=True 면 cert/key 가 없을 때 자체 서명 인증서를 자동 생성.
+    ssl_enabled: bool = True
+    ssl_cert: Optional[str] = None
+    ssl_key: Optional[str] = None
+
     @classmethod
     def from_env(cls) -> "Settings":
         return cls(
@@ -59,6 +65,9 @@ class Settings:
             serial_baud=_env_int("FT_SERIAL_BAUD", 115200),
             ble_mock=_env_bool("FT_BLE_MOCK", True),
             face_force_stub=_env_bool("FT_FACE_STUB", False),
+            ssl_enabled=_env_bool("FT_SSL", True),
+            ssl_cert=_env_str("FT_SSL_CERT"),
+            ssl_key=_env_str("FT_SSL_KEY"),
         )
 
 
