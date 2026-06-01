@@ -87,13 +87,42 @@ python run.py
 # 평문 HTTP, 운영자 장치 SIM 모드, BLE 도 mock
 FT_SSL=0 FT_OPERATOR_PORT=SIM FT_BLE_MOCK=1 python run.py
 
+# 하드웨어 없이 발급 데모: SIM serial + mock BLE + face stub
+FT_SSL=0 FT_OPERATOR_PORT=SIM FT_BLE_MOCK=1 FT_FACE_STUB=1 python run.py
+
 # 4443 포트, 실제 bleak BLE, 실제 시리얼 (COM5)
 FT_PORT=4443 FT_BLE_MOCK=0 FT_OPERATOR_PORT=COM5 python run.py
 ```
 
 PowerShell 에서는 `$env:FT_PORT=4443; python run.py`.
 
-### 6. 동작 확인
+### 6. 하드웨어 없이 발급/입장 확인
+
+로컬 브라우저에서만 확인할 때는 HTTP 로 충분하다. 태블릿을 LAN 의 다른 기기에서 열어 카메라를
+사용하려면 `FT_SSL=0` 을 빼고 HTTPS 로 실행한다.
+
+1. 서버를 데모 모드로 실행한다.
+
+   ```bash
+   FT_SSL=0 FT_OPERATOR_PORT=SIM FT_BLE_MOCK=1 FT_FACE_STUB=1 python run.py
+   ```
+
+2. 같은 브라우저에서 `http://localhost:8000/admin` 과 `http://localhost:8000/tablet` 을 연다.
+3. 운영자 화면에서 `ISSUE` 모드, 운영자 장치가 `CONNECTED@SIM` 인지 확인한다.
+4. `START` 를 누르면 태블릿 화면이 얼굴 캡처를 수행한다.
+5. 운영자 화면 상태가 `await_tag` 로 바뀌면 `WRISTBAND TAGGED` 를 누른다.
+6. 성공하면 태블릿에 발급 완료가 표시되고, `server/issue.db` 의 `issues` 테이블에 active 발급 row 가 남는다.
+
+이 모드는 실제 Arduino/ESP32/FaceNet 모델 없이 WebSocket, 발급 유스케이스, mock BLE 저장, SQLite
+기록까지 이어지는 최소 데모 경로를 확인하는 용도다.
+
+입장까지 확인하려면 운영자 화면에서 `ENTRY` 모드로 전환한 뒤 `START` → `WRISTBAND TAGGED` 순서로
+진행한다. 단, `FT_FACE_STUB=1` 은 이미지 bytes 해시로 임베딩을 만들기 때문에 실제 카메라로 두 번
+촬영하면 같은 사람이어도 이미지 bytes 가 달라져 `DENY` 가 날 수 있다. 입장 PASS 판정까지
+결정적으로 확인하려면 같은 이미지 payload 를 재사용하는 WebSocket smoke test 를 쓰거나,
+실제 얼굴 모델 모드에서 같은 사람을 촬영해야 한다.
+
+### 7. 동작 확인
 
 부팅 로그가 다음 비슷하면 정상:
 
@@ -107,7 +136,7 @@ INFO:     Uvicorn running on https://0.0.0.0:8000 (Press CTRL+C to quit)
 
 각 어댑터의 현재 모드(`stub`/`facenet`, `mock`/`bleak`, `SIM`/실포트)는 운영자 페이지 상단 배지에서도 확인 가능.
 
-### 7. 자주 마주치는 문제
+### 8. 자주 마주치는 문제
 
 - **태블릿에서 카메라가 안 켜진다** → URL 이 `http://` 인지 확인. `https://` + 자체서명 경고 수락이 필수.
 - **`ModuleNotFoundError: No module named 'uvicorn'`** → venv 활성화 안 됨. `which python` / `where python` 으로 `.venv` 경로 확인.
