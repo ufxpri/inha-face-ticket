@@ -1,5 +1,5 @@
 /*
- * arduino_uno.ino — 운영자 장치 통합 슬레이브 (gate + NFC).
+ * arduino-gate.ino — 운영자 장치 통합 슬레이브 (gate + NFC).
  *
  * 노트북 파이썬 서버와 USB 시리얼(115200, 8N1)로 통신한다. 명령은 줄 단위 ASCII이며
  * 한 명령당 한 응답("OK ...", "ERR ...")을 보낸다.
@@ -13,6 +13,7 @@
  *
  * 실제 PN5180 SPI 드라이버는 ELECHOUSE/playfultechnology 라이브러리 사용 권장.
  * 본 스케치는 시리얼 프로토콜 골격 + 게이트 시퀀스를 제공한다.
+ * PN5180 WAKE/CLEAR 구현 전에는 해당 명령이 ERR 를 반환한다.
  */
 
 #include <Servo.h>
@@ -71,10 +72,10 @@ void handleCommand(const String& cmd) {
 void cmdWake() {
   // TODO: PN5180 SPI write 구현
   delay(150);
-  Serial.println("OK");
+  Serial.println("ERR NFC_WAKE_NOT_IMPLEMENTED");
 }
 
-// PASS — 게이트 OPEN + 초음파 통과 감지. 통과 여부와 무관하게 OK 응답 (서버는 OK만 확인).
+// PASS — 게이트 OPEN + 초음파 통과 감지. 서버는 OK passed 만 성공으로 처리한다.
 void cmdPass() {
   digitalWrite(PIN_LED_GREEN, HIGH);
   digitalWrite(PIN_LED_RED, LOW);
@@ -95,7 +96,7 @@ void cmdPass() {
   gateServo.write(SERVO_CLOSED_DEG);
   digitalWrite(PIN_LED_GREEN, LOW);
 
-  // 통과 감지 정보는 디버그 토큰으로만 부착. 서버 코드는 prefix "OK"만 검사한다.
+  // OK timeout 은 실패로 처리되어, 통과 감지 실패가 서버에 전파된다.
   if (passed) Serial.println("OK passed");
   else        Serial.println("OK timeout");
 }
@@ -112,7 +113,7 @@ void cmdDeny() {
 void cmdClear() {
   // TODO: PN5180 SPI 영역 초기화 구현
   delay(150);
-  Serial.println("OK");
+  Serial.println("ERR NFC_CLEAR_NOT_IMPLEMENTED");
 }
 
 float readUltrasonicCm() {

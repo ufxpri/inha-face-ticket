@@ -93,5 +93,9 @@ cd firmware/wristband
 pio run -t upload && pio device monitor
 
 # Arduino UNO (NFC 브리지 + 게이트)
-# Arduino IDE 또는 arduino-cli 로 firmware/arduino-gate/arduino_uno.ino 업로드
+# Arduino IDE 또는 arduino-cli 로 firmware/arduino-gate/arduino-gate.ino 업로드
 ```
+
+`firmware/wristband/platformio.ini` 는 PlatformIO 기본 빌드 디렉터리(`.pio/build`)를 사용한다. OS별 절대 경로를 두지 않아 macOS/Windows 모두 같은 설정으로 빌드할 수 있다.
+
+Arduino UNO 스케치는 현재 서보 게이트(`PASS`/`DENY`) 시퀀스와 통합 시리얼 프로토콜 골격을 제공한다. PN5180 기반 `WAKE`/`CLEAR` 는 아직 구현 전이므로 실제 NFC 발급/반납 장치로 쓰기 전 PN5180 SPI 쓰기/초기화 로직을 완성해야 한다.
