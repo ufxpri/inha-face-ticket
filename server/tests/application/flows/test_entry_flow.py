@@ -106,12 +106,14 @@ class ControlledBleCentral:
         connect_ok: bool = True,
         stored_embedding=_DEFAULT_EMBEDDING,
         contact_flag: bool = False,
+        contact_flag_error: Exception | None = None,
     ) -> None:
         self.connect_ok = connect_ok
         self.stored_embedding = (
             embedding() if stored_embedding is _DEFAULT_EMBEDDING else stored_embedding
         )
         self.contact_flag = contact_flag
+        self.contact_flag_error = contact_flag_error
         self.connect_calls = 0
         self.disconnect_calls = 0
         self.read_embedding_calls = 0
@@ -140,6 +142,8 @@ class ControlledBleCentral:
 
     async def read_contact_flag(self) -> bool:
         self.read_flag_calls += 1
+        if self.contact_flag_error is not None:
+            raise self.contact_flag_error
         return self.contact_flag
 
     async def read_wristband_id(self) -> str:
@@ -254,6 +258,24 @@ async def test_tag_denies_when_contact_flag_is_set() -> None:
     assert result.reason == "⚠ 체결 플래그 = 1 (중간 분리 감지) — 입장 거부"
     assert device.deny_calls == 1
     assert ble.led_codes == [LED_FAILURE]
+
+
+async def test_tag_fails_closed_when_contact_flag_read_raises() -> None:
+    session = Session()
+    flow, device, ble, presenter, _ = make_flow(
+        ble=ControlledBleCentral(contact_flag_error=RuntimeError("flag read failed")),
+        session=session,
+    )
+
+    await flow.start()
+    result = await flow.on_tag()
+
+    assert result.ok is False
+    assert "flag read failed" in (result.reason or "")
+    assert session.embedding is None
+    assert presenter.capture_requests == []
+    assert device.pass_calls == 0
+    assert ble.disconnect_calls == 1
 
 
 async def test_tag_rejects_zero_embedding_as_unissued_wristband() -> None:

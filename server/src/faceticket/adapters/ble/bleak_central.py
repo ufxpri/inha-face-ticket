@@ -7,14 +7,20 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import numpy as np
 
 from faceticket.application.ports import IBleCentral
 from faceticket.config import (
-    CHR_EMB_OFF, CHR_EMBEDDING, CHR_FLAG, CHR_ID, CHR_LED, CHR_SEAT,
-    EMBED_CHUNK, EMBED_DIM, WRISTBAND_NAME,
+    CHR_EMB_OFF,
+    CHR_EMBEDDING,
+    CHR_FLAG,
+    CHR_ID,
+    CHR_LED,
+    CHR_SEAT,
+    EMBED_CHUNK,
+    EMBED_DIM,
+    WRISTBAND_NAME,
 )
 from faceticket.domain.embedding import Embedding
 
@@ -24,10 +30,11 @@ log = logging.getLogger(__name__)
 class BleakBleCentral(IBleCentral):
     def __init__(self) -> None:
         # bleak 는 import 시점에 시스템 BLE 스택을 건드릴 수 있어 lazy import
-        from bleak import BleakClient  # noqa: F401
+        from bleak import BleakClient as _C
+        from bleak import BleakScanner as _S
+
         self._BleakClient = None
         self._BleakScanner = None
-        from bleak import BleakClient as _C, BleakScanner as _S
         self._BleakClient = _C
         self._BleakScanner = _S
         self.client = None
@@ -74,7 +81,7 @@ class BleakBleCentral(IBleCentral):
             log.warning("좌석 write 실패: %s", e)
             return False
 
-    async def read_embedding(self) -> Optional[Embedding]:
+    async def read_embedding(self) -> Embedding | None:
         total = EMBED_DIM * 4
         buf = bytearray(total)
         try:
@@ -94,7 +101,7 @@ class BleakBleCentral(IBleCentral):
             return bool(data and data[0])
         except Exception as e:
             log.warning("체결 플래그 read 실패: %s", e)
-            return False
+            return True
 
     async def read_wristband_id(self) -> str:
         try:

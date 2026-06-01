@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Awaitable, Callable, Optional
+from collections.abc import Callable
 
 try:
     import serial as pyserial
@@ -18,6 +18,7 @@ except Exception:
 log = logging.getLogger(__name__)
 
 SIM_PORT = "SIM"
+FAILURE_DETAILS = {"timeout", "err", "error", "fail", "failed"}
 
 # 명령 → 가짜 응답 함수
 SimResponseFn = Callable[[str], str]
@@ -32,7 +33,7 @@ class SerialTransport:
         *,
         baud: int = 115200,
         timeout_s: float = 2.0,
-        sim_response: Optional[SimResponseFn] = None,
+        sim_response: SimResponseFn | None = None,
         sim_latency: float = 0.2,
     ) -> None:
         self.name = name
@@ -41,8 +42,8 @@ class SerialTransport:
         self._sim_response = sim_response or (lambda _cmd: "OK")
         self._sim_latency = sim_latency
 
-        self._ser: Optional["pyserial.Serial"] = None
-        self._port: Optional[str] = None
+        self._ser: pyserial.Serial | None = None
+        self._port: str | None = None
         self._sim: bool = False
         self._lock = asyncio.Lock()
 
@@ -52,7 +53,7 @@ class SerialTransport:
         return self._ser is not None or self._sim
 
     @property
-    def port(self) -> Optional[str]:
+    def port(self) -> str | None:
         return self._port
 
     # ── 라이프사이클 ─────────────────────────────────────────
@@ -118,10 +119,15 @@ class SerialTransport:
         return raw.decode("ascii", errors="replace").strip()
 
     async def send_ok(self, line: str, *, expected: str = "OK") -> bool:
-        """`expected` 로 시작하면 True. 예외 시 False (로그만)."""
+        """응답의 첫 공백 구분 토큰이 `expected` 와 정확히 같으면 True."""
         try:
             resp = await self.send(line)
         except Exception as e:
             log.warning("[%s] %r 송신 오류: %s", self.name, line, e)
             return False
-        return resp.startswith(expected)
+        parts = resp.split(" ")
+        if not parts or parts[0] != expected:
+            return False
+        if len(parts) > 1 and parts[1].lower() in FAILURE_DETAILS:
+            return False
+        return True
