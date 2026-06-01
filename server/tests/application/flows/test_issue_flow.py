@@ -4,9 +4,14 @@ import pytest
 from faceticket.adapters.ble.mock_central import MockBleCentral
 from faceticket.adapters.devices.operator import OperatorDevice
 from faceticket.application.flows.issuance import IssueFlow
+from faceticket.application.ports import IssueRecord
 from faceticket.config import EMBED_DIM, LED_ISSUED
 from faceticket.domain.embedding import l2_normalize
-from faceticket.domain.errors import MissingDeviceError, MissingEmbeddingError
+from faceticket.domain.errors import (
+    ActiveIssueConflictError,
+    MissingDeviceError,
+    MissingEmbeddingError,
+)
 from faceticket.domain.session import Session
 from faceticket.domain.states import Flow, FlowState
 
@@ -22,6 +27,14 @@ class InMemoryIssueRepository:
         self.records: list[tuple[str, str, str]] = []
 
     def record_issue(self, wristband_id: str, seat: str, name: str = "") -> int:
+        active_wristband = self.find_active_by_wristband(wristband_id)
+        if active_wristband is not None:
+            raise ActiveIssueConflictError("active wristband duplicate")
+
+        active_seat = self.find_active_by_seat(seat)
+        if active_seat is not None:
+            raise ActiveIssueConflictError("active seat duplicate")
+
         self.records.append((wristband_id, seat, name))
         return len(self.records)
 
@@ -34,7 +47,16 @@ class InMemoryIssueRepository:
             for i, (wid, seat, name) in enumerate(self.records, start=1)
         ]
 
-    def find_active_by_wristband(self, wristband_id: str):
+    def find_active_by_wristband(self, wristband_id: str) -> IssueRecord | None:
+        for i, (wid, seat, name) in enumerate(self.records, start=1):
+            if wid == wristband_id:
+                return IssueRecord(i, wid, seat, name, "now")
+        return None
+
+    def find_active_by_seat(self, seat: str) -> IssueRecord | None:
+        for i, (wid, active_seat, name) in enumerate(self.records, start=1):
+            if active_seat == seat:
+                return IssueRecord(i, wid, active_seat, name, "now")
         return None
 
     def close(self) -> None:
@@ -294,6 +316,43 @@ async def test_tag_returns_failure_when_embedding_write_fails() -> None:
     assert ble.written_seat == ""
     assert ble.led_codes == []
     assert repo.records == []
+
+
+async def test_tag_rejects_active_wristband_before_ble_write() -> None:
+    repo = InMemoryIssueRepository()
+    repo.records.append(("WB-TEST", "A-99", "Existing User"))
+    ble = ControlledBleCentral()
+    flow, _, _, _ = make_flow(ble=ble, repo=repo)
+
+    await flow.start("A-01", "Kim")
+    await flow.on_face_captured(embedding())
+    outcome = await flow.on_tag()
+
+    assert outcome.ok is False
+    assert "이미 발급 중인 팔찌" in (outcome.reason or "")
+    assert ble.written_embedding is None
+    assert ble.written_seat == ""
+    assert ble.led_codes == []
+    assert repo.records == [("WB-TEST", "A-99", "Existing User")]
+
+
+async def test_tag_rejects_active_seat_before_ble_write() -> None:
+    repo = InMemoryIssueRepository()
+    repo.records.append(("WB-OTHER", "A-01", "Existing User"))
+    ble = ControlledBleCentral()
+    ble.wristband_id = "WB-NEW"
+    flow, _, _, _ = make_flow(ble=ble, repo=repo)
+
+    await flow.start("A-01", "Kim")
+    await flow.on_face_captured(embedding())
+    outcome = await flow.on_tag()
+
+    assert outcome.ok is False
+    assert "이미 발급 중인 좌석" in (outcome.reason or "")
+    assert ble.written_embedding is None
+    assert ble.written_seat == ""
+    assert ble.led_codes == []
+    assert repo.records == [("WB-OTHER", "A-01", "Existing User")]
 
 
 async def test_successful_tag_writes_seat_records_issue_and_sets_led() -> None:
