@@ -43,3 +43,32 @@ async def test_send_ok_honors_expected_response_token() -> None:
     assert await send_ok_for_response("READY", expected="READY") is True
     assert await send_ok_for_response("READY soon", expected="READY") is True
     assert await send_ok_for_response("READYING", expected="READY") is False
+
+
+class FakeSerial:
+    def __init__(self, response: bytes = b"OK\n") -> None:
+        self.timeout = 2.0
+        self.response = response
+        self.writes: list[bytes] = []
+        self.timeout_seen_during_read: float | None = None
+
+    def write(self, payload: bytes) -> int:
+        self.writes.append(payload)
+        return len(payload)
+
+    def readline(self) -> bytes:
+        self.timeout_seen_during_read = self.timeout
+        return self.response
+
+
+async def test_send_ok_uses_temporary_serial_timeout_and_restores_default() -> None:
+    transport = SerialTransport("TEST")
+    fake = FakeSerial()
+    transport._ser = fake
+    transport._port = "/dev/test"
+
+    assert await transport.send_ok("PASS", timeout_s=7.0) is True
+
+    assert fake.writes == [b"PASS\n"]
+    assert fake.timeout_seen_during_read == 7.0
+    assert fake.timeout == 2.0

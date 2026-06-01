@@ -101,7 +101,7 @@ class SerialTransport:
         self._port = None
 
     # ── 송수신 ───────────────────────────────────────────────
-    async def send(self, line: str) -> str:
+    async def send(self, line: str, *, timeout_s: float | None = None) -> str:
         """한 줄 송신 → 한 줄 응답. 미연결이면 RuntimeError."""
         if self._sim:
             await asyncio.sleep(self._sim_latency)
@@ -112,16 +112,28 @@ class SerialTransport:
             raise RuntimeError(f"{self.name} 미연결")
         async with self._lock:
             loop = asyncio.get_running_loop()
-            await loop.run_in_executor(
-                None, self._ser.write, (line + "\n").encode("ascii", "ignore")
-            )
-            raw = await loop.run_in_executor(None, self._ser.readline)
+            old_timeout = self._ser.timeout
+            if timeout_s is not None:
+                self._ser.timeout = timeout_s
+            try:
+                await loop.run_in_executor(
+                    None, self._ser.write, (line + "\n").encode("ascii", "ignore")
+                )
+                raw = await loop.run_in_executor(None, self._ser.readline)
+            finally:
+                self._ser.timeout = old_timeout
         return raw.decode("ascii", errors="replace").strip()
 
-    async def send_ok(self, line: str, *, expected: str = "OK") -> bool:
+    async def send_ok(
+        self,
+        line: str,
+        *,
+        expected: str = "OK",
+        timeout_s: float | None = None,
+    ) -> bool:
         """응답의 첫 공백 구분 토큰이 `expected` 와 정확히 같으면 True."""
         try:
-            resp = await self.send(line)
+            resp = await self.send(line, timeout_s=timeout_s)
         except Exception as e:
             log.warning("[%s] %r 송신 오류: %s", self.name, line, e)
             return False
