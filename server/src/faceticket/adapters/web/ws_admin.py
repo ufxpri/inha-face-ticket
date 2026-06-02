@@ -77,5 +77,9 @@ class AdminWebSocketHandler:
             await self.devices.disconnect(cmd.role or ROLE_NFC)
         elif t == "io_refresh_ports":
             await self.devices.refresh_ports()
+        elif t == "led":
+            await self.devices.set_led(cmd.command)
+        elif t == "led_stop":
+            await self.devices.stop_led()
         else:
             log.warning("알 수 없는 admin 메시지: %s", t)

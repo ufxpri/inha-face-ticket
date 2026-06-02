@@ -55,8 +55,8 @@ class IssueFlow(FlowBase):
             raise MissingEmbeddingError("얼굴 임베딩이 없습니다.")
 
         dev = self.require_device()
-        await self.presenter.emit_log("④ 운영자 장치에 wake 명령 전송 (Serial)")
-        if not await dev.wake_wristband():
+        await self.presenter.emit_log("④ 팔찌를 NFC 리더에 대주세요 — wake 대기 중 (최대 5초)")
+        if not await dev.wake_wristband_wait():
             return IssueOutcome(False, reason="wake 실패 — 장치 상태를 확인하세요.")
 
         await self.presenter.emit_log("⑤ 팔찌 BLE 광고 대기 후 Central 연결 시도")

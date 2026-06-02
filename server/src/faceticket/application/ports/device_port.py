@@ -19,6 +19,20 @@ ROLE_NFC = "nfc"
 ROLE_GATE = "gate"
 ROLES = (ROLE_NFC, ROLE_GATE)
 
+# 팔찌 LED 명령 화이트리스트 — ESP32(NFC 보드)가 ESP-NOW 로 팔찌에 브로드캐스트하는 RGB 명령.
+# 펌웨어(esp32-pn5180-smoke)가 실제 구현한 단색 4종만 허용. 임의 시리얼 주입 방지용.
+LED_COMMANDS = frozenset({"RGB R", "RGB G", "RGB B", "RGB OFF"})
+
+# 서버 측 LED 패턴 — 펌웨어는 단색만 알기에, 서버가 프리미티브(RGB R/G/B/OFF)를 시간차로
+# 연속 전송해 패턴을 "재생"한다. 각 패턴은 (명령, 지속초) 프레임의 무한 반복 시퀀스.
+# 밝기 단계가 없어 BREATHE 는 on/off 펄스로 근사한다.
+LED_PATTERNS = {
+    "PATTERN RAINBOW": [("RGB R", 0.5), ("RGB G", 0.5), ("RGB B", 0.5)],
+    "PATTERN BLINK":   [("RGB R", 0.4), ("RGB OFF", 0.4)],
+    "PATTERN BREATHE": [("RGB B", 0.8), ("RGB OFF", 0.8)],
+    "PATTERN STROBE":  [("RGB R", 0.07), ("RGB OFF", 0.07)],
+}
+
 
 @runtime_checkable
 class IOperatorDevice(Protocol):
@@ -36,6 +50,11 @@ class IOperatorDevice(Protocol):
     def status_snapshot(self) -> dict: ...
 
     async def wake_wristband(self) -> bool: ...
+    # 태그가 RF 필드에 들어올 때까지 WAKE 를 폴링. NFC_NO_TAG 는 재시도, 그 외 오류는 즉시 실패.
+    async def wake_wristband_wait(self, *, timeout_s: float = 5.0) -> bool: ...
     async def signal_pass(self) -> bool: ...
     async def signal_deny(self) -> bool: ...
     async def clear_wristband(self) -> bool: ...
+
+    # 팔찌 LED — NFC(ESP32) 보드로 RGB 명령 라인 전송 (ESP-NOW 브로드캐스트).
+    async def set_led(self, command: str) -> bool: ...

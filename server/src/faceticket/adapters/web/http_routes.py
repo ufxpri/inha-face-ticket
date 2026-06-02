@@ -21,6 +21,7 @@ def create_router() -> APIRouter:
             "<ul>"
             "<li><a href='/admin'>운영자 — 발급/입장/반납 페이지</a></li>"
             "<li><a href='/tablet'>관객 — 태블릿 얼굴 캡처 페이지</a></li>"
+            "<li><a href='/wristband'>팔찌 LED 컨트롤 페이지</a></li>"
             "</ul>"
         )
 
@@ -31,6 +32,10 @@ def create_router() -> APIRouter:
     @r.get("/tablet", response_class=HTMLResponse)
     async def tablet_page() -> FileResponse:
         return FileResponse(TEMPLATES_DIR / "tablet.html")
+
+    @r.get("/wristband", response_class=HTMLResponse)
+    async def wristband_page() -> FileResponse:
+        return FileResponse(TEMPLATES_DIR / "wristband.html")
 
     @r.get("/api/active")
     async def api_active(request: Request) -> JSONResponse:

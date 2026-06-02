@@ -26,6 +26,7 @@ class ToggleService:
         session: Session,
         presenter: IPresenter,
         tablet_count_provider,                 # () -> int
+        led_pattern_provider=lambda: "",       # () -> str (재생 중 LED 패턴, "" = 없음)
     ) -> None:
         self.face = face
         self.ble_swap = ble_swap
@@ -33,6 +34,7 @@ class ToggleService:
         self.session = session
         self.presenter = presenter
         self._tablet_count = tablet_count_provider
+        self._led_pattern = led_pattern_provider
 
     # ── 토글 ─────────────────────────────────────────────────
     async def toggle(self, layer: str, mock: bool) -> None:
@@ -75,6 +77,8 @@ class ToggleService:
             "available_ports":  list_serial_ports(),
             # 역할별 상태 — { "nfc": {connected, port}, "gate": {connected, port} }
             "devices":          self.device.status_snapshot(),
+            # 서버에서 재생 중인 LED 패턴 명령 ("" = 정지)
+            "led_pattern":      self._led_pattern(),
         }
 
     async def broadcast_flags(self) -> None:

@@ -77,6 +77,8 @@ def build_container(settings: Settings) -> Container:
         face=face, ble_swap=ble, device=device,
         session=session, presenter=presenter,
         tablet_count_provider=lambda: len(tablets),
+        # 아래 device_service 가 이 lambda 호출 시점엔 이미 존재 (late binding).
+        led_pattern_provider=lambda: device_service.led_pattern,
     )
     device_service = DeviceService(
         device=device, session=session, presenter=presenter,

@@ -32,6 +32,10 @@ class FakeOperatorDevice:
         self.calls.append("WAKE")
         return True
 
+    async def wake_wristband_wait(self, *, timeout_s: float = 5.0) -> bool:
+        self.calls.append("WAKE_WAIT")
+        return True
+
     async def clear_wristband(self) -> bool:
         self.calls.append("CLEAR")
         return True
@@ -48,6 +52,13 @@ class FakeOperatorDevice:
 def make_split() -> tuple[SplitOperatorDevice, FakeOperatorDevice, FakeOperatorDevice]:
     nfc, gate = FakeOperatorDevice(), FakeOperatorDevice()
     return SplitOperatorDevice(nfc=nfc, gate=gate), nfc, gate
+
+
+async def test_wake_wait_routes_to_nfc_device_only() -> None:
+    dev, nfc, gate = make_split()
+    assert await dev.wake_wristband_wait(timeout_s=1.0) is True
+    assert nfc.calls == ["WAKE_WAIT"]
+    assert gate.calls == []
 
 
 async def test_nfc_commands_route_to_nfc_device_only() -> None:

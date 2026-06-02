@@ -74,6 +74,9 @@ class SplitOperatorDevice(IOperatorDevice):
     async def wake_wristband(self) -> bool:
         return await self.nfc.wake_wristband()
 
+    async def wake_wristband_wait(self, *, timeout_s: float = 5.0) -> bool:
+        return await self.nfc.wake_wristband_wait(timeout_s=timeout_s)
+
     async def clear_wristband(self) -> bool:
         return await self.nfc.clear_wristband()
 
@@ -82,3 +85,7 @@ class SplitOperatorDevice(IOperatorDevice):
 
     async def signal_deny(self) -> bool:
         return await self.gate.signal_deny()
+
+    # 팔찌 LED 는 ESP-NOW 송신기인 NFC(ESP32) 보드로 라우팅.
+    async def set_led(self, command: str) -> bool:
+        return await self.nfc.set_led(command)

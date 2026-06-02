@@ -16,8 +16,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 
-from faceticket.adapters.devices.serial_io import SerialTransport
+from faceticket.adapters.devices.serial_io import FAILURE_DETAILS, SerialTransport
 from faceticket.application.ports import ROLE_GATE, ROLE_NFC, IOperatorDevice
 
 log = logging.getLogger(__name__)
@@ -29,6 +30,12 @@ PASS_RESPONSE_TIMEOUT_S = 7.0
 HANDSHAKE_ATTEMPTS = 8
 HANDSHAKE_INTERVAL_S = 0.35
 HANDSHAKE_PING_TIMEOUT_S = 0.6
+
+# wake 폴링 — 운영자가 TAGGED 누른 뒤 팔찌(ST25DV)를 리더에 댈 여유. NFC_NO_TAG 는
+# '아직 안 댐'이라 재시도, RF/READER/VERIFY 등 하드웨어 오류는 무한 대기 무의미라 즉시 실패.
+WAKE_WAIT_TIMEOUT_S = 5.0
+WAKE_POLL_INTERVAL_S = 0.3
+NFC_NO_TAG_TOKEN = "NO_TAG"
 
 
 def _sim_response(cmd: str) -> str:
@@ -89,6 +96,39 @@ class OperatorDevice(IOperatorDevice):
     async def wake_wristband(self) -> bool:
         return await self._t.send_ok("WAKE")
 
+    async def wake_wristband_wait(self, *, timeout_s: float = WAKE_WAIT_TIMEOUT_S) -> bool:
+        """태그가 RF 필드에 들어올 때까지 WAKE 를 폴링.
+
+        - OK 응답 → 즉시 True.
+        - NFC_NO_TAG (아직 안 댐) → interval 후 재시도, deadline 까지.
+        - 그 외 ERR (RF/READER/VERIFY 등 하드웨어/쓰기 오류) → 무한 대기 무의미 → 즉시 False.
+        - deadline 초과 → False (팔찌 미감지).
+        """
+        deadline = time.monotonic() + timeout_s
+        attempt = 0
+        while True:
+            attempt += 1
+            try:
+                resp = await self._t.send("WAKE")
+            except Exception as e:
+                log.warning("[OPERATOR] WAKE 송신 오류: %s", e)
+                resp = ""
+            parts = resp.split(" ")
+            ok = parts[:1] == ["OK"] and not (
+                len(parts) > 1 and parts[1].lower() in FAILURE_DETAILS
+            )
+            if ok:
+                if attempt > 1:
+                    log.info("[OPERATOR] wake OK (시도 %d)", attempt)
+                return True
+            if NFC_NO_TAG_TOKEN not in resp.upper():
+                log.warning("[OPERATOR] wake 실패(재시도 불가): %r", resp)
+                return False
+            if time.monotonic() >= deadline:
+                log.info("[OPERATOR] wake 타임아웃 — 팔찌 미감지 (%.0fs, %d회)", timeout_s, attempt)
+                return False
+            await asyncio.sleep(WAKE_POLL_INTERVAL_S)
+
     async def signal_pass(self) -> bool:
         return await self._t.send_ok("PASS", timeout_s=PASS_RESPONSE_TIMEOUT_S)
 
@@ -97,3 +137,7 @@ class OperatorDevice(IOperatorDevice):
 
     async def clear_wristband(self) -> bool:
         return await self._t.send_ok("CLEAR")
+
+    async def set_led(self, command: str) -> bool:
+        # 펌웨어는 "RGB R" → "OK RGB=R" 식으로 응답. send_ok 가 첫 토큰 OK 확인.
+        return await self._t.send_ok(command)

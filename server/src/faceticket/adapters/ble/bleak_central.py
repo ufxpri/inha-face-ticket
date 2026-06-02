@@ -3,6 +3,12 @@
 `EMBED_DIM * 4 = 2048 B` > BLE 단일 attribute 한계(512 B) 이므로 청크. payload:
     write: [u16_le offset][data <= EMBED_CHUNK]
     read : write(CHR_EMB_OFF, offset) → read(CHR_EMBEDDING) 으로 256B 반환
+
+⚠ 알려진 이슈(Windows): 이 어댑터를 **서버 프로세스(uvicorn + torch 등)** 안에서 돌리면
+   connect 는 성공하나 'services changed' 인디케이션 직후 GATT read 가 hang 한다.
+   동일 코드가 **별도 프로세스의 asyncio.run** 에서는 정상이다(scripts/ble_wristband_test.py).
+   루프 타입(Proactor/Selector)·전용 스레드로는 해결 안 됨 — 프로세스 환경 자체의 문제.
+   근본 해결책은 BLE 작업을 별도 worker 프로세스로 분리하는 것(향후 작업).
 """
 from __future__ import annotations
 
@@ -12,6 +18,7 @@ import numpy as np
 
 from faceticket.application.ports import IBleCentral
 from faceticket.config import (
+    CHR_CTRL,
     CHR_EMB_OFF,
     CHR_EMBEDDING,
     CHR_FLAG,
@@ -33,8 +40,6 @@ class BleakBleCentral(IBleCentral):
         from bleak import BleakClient as _C
         from bleak import BleakScanner as _S
 
-        self._BleakClient = None
-        self._BleakScanner = None
         self._BleakClient = _C
         self._BleakScanner = _S
         self.client = None
@@ -56,6 +61,11 @@ class BleakBleCentral(IBleCentral):
 
     async def disconnect(self) -> None:
         if self.client and self.client.is_connected:
+            try:
+                # 모드 전환 명령 — 팔찌가 BLE 종료 후 ESP-NOW 로 복귀. best-effort(연결이 곧 끊겨도 무방).
+                await self.client.write_gatt_char(CHR_CTRL, b"\x01", response=False)
+            except Exception:
+                pass
             try:
                 await self.client.disconnect()
             except Exception as e:

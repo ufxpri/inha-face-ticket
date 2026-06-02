@@ -12,5 +12,7 @@ CHR_FLAG:      str = "12345678-1234-5678-1234-56789abcdef3"
 CHR_LED:       str = "12345678-1234-5678-1234-56789abcdef4"
 CHR_ID:        str = "12345678-1234-5678-1234-56789abcdef5"
 CHR_EMB_OFF:   str = "12345678-1234-5678-1234-56789abcdef6"
+# 모드 전환 control char — write → 팔찌가 BLE 종료 후 ESP-NOW 모드로 복귀.
+CHR_CTRL:      str = "12345678-1234-5678-1234-56789abcdef7"
 
 EMBED_CHUNK: int = 256

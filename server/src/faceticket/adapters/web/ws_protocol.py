@@ -71,6 +71,7 @@ class AdminCommand:
     mock: bool = False            # toggle 용
     port: str = ""                # io_connect 용
     role: str = ""                # io_connect/io_disconnect 용 ("nfc" | "gate")
+    command: str = ""             # led 용 — 단색("RGB R/G/B/OFF") 또는 패턴("PATTERN RAINBOW" 등, LED_PATTERNS 키)
 
 
 def parse_admin_message(data: dict) -> AdminCommand:
@@ -83,4 +84,5 @@ def parse_admin_message(data: dict) -> AdminCommand:
         mock=bool(data.get("mock", False)),
         port=str(data.get("port", "")),
         role=str(data.get("role", "")).strip(),
+        command=str(data.get("command", "")).strip(),
     )

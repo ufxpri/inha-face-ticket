@@ -12,6 +12,8 @@
 """
 from faceticket.application.ports.ble_port import IBleCentral
 from faceticket.application.ports.device_port import (
+    LED_COMMANDS,
+    LED_PATTERNS,
     ROLE_GATE,
     ROLE_NFC,
     ROLES,
@@ -23,7 +25,7 @@ from faceticket.application.ports.presenter import IPresenter, LogLevel
 
 __all__ = [
     "IBleCentral",
-    "IOperatorDevice", "ROLE_NFC", "ROLE_GATE", "ROLES",
+    "IOperatorDevice", "ROLE_NFC", "ROLE_GATE", "ROLES", "LED_COMMANDS", "LED_PATTERNS",
     "ExtractResult", "IFaceRecognizer",
     "IIssueRepository", "IssueRecord",
     "IPresenter", "LogLevel",
