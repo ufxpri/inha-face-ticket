@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 from faceticket.application.flows._base import FlowBase
 from faceticket.config import COSINE_THRESHOLD, LED_FAILURE, LED_SUCCESS
@@ -16,7 +15,7 @@ log = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class EntryTagResult:
     ok: bool
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -71,6 +70,9 @@ class EntryFlow(FlowBase):
         except Exception as e:
             log.exception("entry on_tag")
             return EntryTagResult(False, f"entry 단계 오류: {e}")
+        finally:
+            if self.session.embedding is None:
+                await self._safe_ble_disconnect()
 
     async def on_face_captured(self, live_embedding: Embedding) -> EntryFaceResult:
         """비교 → signal_pass/deny → LED → BLE disconnect."""

@@ -3,13 +3,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 from faceticket.application.flows._base import FlowBase
 from faceticket.application.ports import IIssueRepository
 from faceticket.config import LED_ISSUED
 from faceticket.domain.embedding import Embedding
-from faceticket.domain.errors import MissingEmbeddingError
+from faceticket.domain.errors import ActiveIssueConflictError, MissingEmbeddingError
 from faceticket.domain.states import Flow, FlowState
 
 log = logging.getLogger(__name__)
@@ -21,7 +20,7 @@ class IssueOutcome:
     wristband_id: str = ""
     seat: str = ""
     issue_id: int = 0
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class IssueFlow(FlowBase):
@@ -65,13 +64,36 @@ class IssueFlow(FlowBase):
             if not connected:
                 return IssueOutcome(False, reason="BLE 연결 실패")
 
+            wid = await self.ble.read_wristband_id()
+            if not wid:
+                return IssueOutcome(False, reason="팔찌 ID read 실패")
+
+            active_wristband = self.repo.find_active_by_wristband(wid)
+            if active_wristband is not None:
+                return IssueOutcome(
+                    False,
+                    reason=f"이미 발급 중인 팔찌입니다: {wid} → 좌석 {active_wristband.seat}",
+                )
+
+            active_seat = self.repo.find_active_by_seat(self.session.seat)
+            if active_seat is not None:
+                return IssueOutcome(
+                    False,
+                    reason=(
+                        f"이미 발급 중인 좌석입니다: "
+                        f"{self.session.seat} → 팔찌 {active_seat.wristband_id}"
+                    ),
+                )
+
             await self.presenter.emit_log("⑥ 임베딩 / 좌석 정보 write (BLE GATT)")
             if not await self.ble.write_embedding(self.session.embedding):
                 return IssueOutcome(False, reason="임베딩 write 실패")
             await self.ble.write_seat(self.session.seat)
 
-            wid = await self.ble.read_wristband_id()
-            issue_id = self.repo.record_issue(wid, self.session.seat, self.session.name)
+            try:
+                issue_id = self.repo.record_issue(wid, self.session.seat, self.session.name)
+            except ActiveIssueConflictError as e:
+                return IssueOutcome(False, reason=str(e))
             await self.presenter.emit_log(
                 f"⑦ SQLite 기록 — issue#{issue_id} 팔찌 {wid} → 좌석 {self.session.seat}"
             )

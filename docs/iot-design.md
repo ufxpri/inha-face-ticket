@@ -31,8 +31,8 @@
 |---|---|---|---|
 | **WebSocket** | 태블릿 ↔ 노트북 | 카메라 트리거, 이미지 바이너리, 상태 표시 | [`ws-protocol.md`](ws-protocol.md) |
 | **HTTP / HTTPS** | 운영자 브라우저 ↔ 노트북 | 운영자 페이지 + 발급 기록 조회 | [`ws-protocol.md`](ws-protocol.md) |
-| **USB Serial** | 노트북 ↔ Arduino | NFC write/read, 게이트 OPEN/DENY, 통과 감지 | [`serial-protocol.md`](serial-protocol.md) |
-| **SPI** | Arduino ↔ PN5180 | ISO 15693 트랜잭션 | [`serial-protocol.md`](serial-protocol.md) |
+| **USB Serial** | 노트북 ↔ ESP32-C3 PN5180 writer 또는 Arduino gate | NFC write/read, 게이트 OPEN/DENY, 통과 감지 | [`serial-protocol.md`](serial-protocol.md) |
+| **SPI** | ESP32-C3 ↔ PN5180 | ISO 15693 트랜잭션 | [`serial-protocol.md`](serial-protocol.md) |
 | **NFC (RF)** | PN5180 ↔ ST25DV16K | BLE 연결 정보 기록, GPO 펄스 유발 | [`ble-protocol.md`](ble-protocol.md) |
 | **BLE GATT** | 노트북 ↔ ESP32-C3 | 임베딩·좌석·플래그·LED 효과 read/write | [`ble-protocol.md`](ble-protocol.md) |
 | **BLE Broadcast** | 큐 송출 노트북 → 다수 팔찌 | 공연 중 동기 LED 큐 (비연결, 일대다) | [`ble-protocol.md`](ble-protocol.md) |
@@ -50,9 +50,9 @@ ESP32-C3 의 GPIO 13개는 BLE/OLED/스위치/RGB LED 까지 쓰고 나면 빠�
 
 ## ⑤ 로직 레벨 / 전기적 호환성 검토
 
-5V Arduino UNO ↔ 3.3V PN5180 ↔ 13.56MHz RF ↔ 3.3V ESP32-C3 ↔ 1.8~5.5V ST25DV16K 가 모두 한 회로에서 동작해야 한다.
+3.3V ESP32-C3 ↔ 3.3V PN5180 로직 ↔ 13.56MHz RF ↔ ST25DV16K 가 NFC trigger 경로다. Arduino UNO는 레벨 시프터가 없으면 PN5180에 직접 연결하지 않고 물리 게이트 스켈레톤으로만 운용한다.
 
-- **로직 레벨** — PN5180 모듈의 `PVDD = 3V3` 솔더 점퍼로 5V 로직을 3.3V 로 정합. ST25DV16K 모듈은 SDA/SCL 내장 10kΩ 풀업으로 레벨 시프터 불필요
+- **로직 레벨** — ESP32-C3 GPIO와 PN5180 `PVDD = 3V3` 로직이 직접 정합. ST25DV16K 모듈은 SDA/SCL 내장 10kΩ 풀업으로 레벨 시프터 불필요
 - **RF/로직 전원 분리** — PN5180 `VDD = 5V` (RF/안테나 구동), `PVDD = 3.3V` (디지털 로직) 분리로 안테나 전류 확보
 - **전원 경로** — USB-C 5V → TP4056 → DTP652533 LiPo + ESP32-C3 보드 5V 핀(온보드 AMS1117 LDO 입력) 병렬. USB 미연결 시 배터리로 LDO 구동
 - **NFC 프로토콜** — ST25DV16K(NFC Type 5 / ISO 15693) 와 PN5180(ISO 14443A/B · 15693 · FeliCa) 완전 호환

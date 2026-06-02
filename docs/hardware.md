@@ -38,8 +38,8 @@ USB 미연결 시 배터리 3.7~4.2V 로 LDO 구동, USB 연결 시 충전·전�
 | ESP32-C3 GPIO | 3.3V | 기준 |
 | ST25DV16K | 1.8~5.5V | 3.3V 직결 가능, SDA/SCL 내장 10kΩ 풀업으로 레벨 시프터 불필요 |
 | ST25DV16K GPO | TTL (3.3V) | ESP32-C3 GPIO 인터럽트 직결 가능 |
-| Arduino UNO | 5V | PN5180 의 PVDD=3V3 점퍼로 3.3V 정합 |
-| PN5180 PVDD | 3.3V (로직) | Arduino UNO ↔ PN5180 SPI 정합 |
+| Arduino UNO | 5V | 물리 게이트 스켈레톤 전용. PN5180과 직접 연결하지 않음 |
+| PN5180 PVDD | 3.3V (로직) | ESP32-C3 ↔ PN5180 SPI 정합 |
 | PN5180 VDD | 5V (RF) | 안테나 구동 전류 확보 (PVDD 와 분리) |
 
 ### I²C 버스 공유 (팔찌 측)
@@ -92,6 +92,14 @@ DTP652533 500 mAh 기준, 평시 sleep 위주 + BLE 단속적 활성으로 단�
 cd firmware/wristband
 pio run -t upload && pio device monitor
 
-# Arduino UNO (NFC 브리지 + 게이트)
-# Arduino IDE 또는 arduino-cli 로 firmware/arduino-gate/arduino_uno.ino 업로드
+# Arduino UNO (게이트 스켈레톤)
+# Arduino IDE 또는 arduino-cli 로 firmware/arduino-gate/arduino-gate.ino 업로드
 ```
+
+`firmware/wristband/platformio.ini` 는 PlatformIO 기본 빌드 디렉터리(`.pio/build`)를 사용한다. OS별 절대 경로를 두지 않아 macOS/Windows 모두 같은 설정으로 빌드할 수 있다.
+
+Arduino UNO 스케치는 서보 게이트(`PASS`/`DENY`) 시퀀스만 유지한다. 레벨 시프터 없이 PN5180을 UNO에 직접 연결하지 않기 위해 `WAKE`/`CLEAR` 는 `ERR NFC_*_NOT_IMPLEMENTED` 를 반환하는 fail-closed placeholder 다.
+
+PN5180 기반 NFC `WAKE`/`CLEAR` 는 `firmware/tools/esp32-pn5180-smoke` 의 ESP32-C3 firmware 를 사용한다. 이 firmware 는 ST25DV16K user memory block 8 에 `FTWK` 기록/초기화를 수행하고, 서버 operator 계약용 `PASS`/`DENY` 응답도 제공한다.
+
+업로드 직후 smoke test 절차는 [`hardware-smoke-test.md`](hardware-smoke-test.md) 를 따른다. CLI 헬퍼는 `scripts/hardware-smoke-test.py` 에 있다.

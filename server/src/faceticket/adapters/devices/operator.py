@@ -15,12 +15,13 @@ DENY = 적색 LED 같은 식으로 implement.
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from faceticket.adapters.devices.serial_io import SerialTransport
 from faceticket.application.ports import IOperatorDevice
 
 log = logging.getLogger(__name__)
+
+PASS_RESPONSE_TIMEOUT_S = 7.0
 
 
 def _sim_response(cmd: str) -> str:
@@ -43,7 +44,7 @@ class OperatorDevice(IOperatorDevice):
         return self._t.is_connected
 
     @property
-    def port(self) -> Optional[str]:
+    def port(self) -> str | None:
         return self._t.port
 
     async def connect(self, port: str) -> bool:
@@ -63,7 +64,7 @@ class OperatorDevice(IOperatorDevice):
         return await self._t.send_ok("WAKE")
 
     async def signal_pass(self) -> bool:
-        return await self._t.send_ok("PASS")
+        return await self._t.send_ok("PASS", timeout_s=PASS_RESPONSE_TIMEOUT_S)
 
     async def signal_deny(self) -> bool:
         return await self._t.send_ok("DENY")

@@ -14,6 +14,10 @@ from faceticket.application.toggle_service import ToggleService
 log = logging.getLogger(__name__)
 
 
+def _is_disconnect_runtime_error(exc: RuntimeError) -> bool:
+    return "WebSocket is not connected" in str(exc)
+
+
 class AdminWebSocketHandler:
     def __init__(
         self,
@@ -38,6 +42,9 @@ class AdminWebSocketHandler:
                 await self._dispatch(wp.parse_admin_message(data))
         except WebSocketDisconnect:
             pass
+        except RuntimeError as e:
+            if not _is_disconnect_runtime_error(e):
+                log.exception("/ws/admin")
         except Exception:
             log.exception("/ws/admin")
         finally:
@@ -45,16 +52,29 @@ class AdminWebSocketHandler:
 
     async def _dispatch(self, cmd: wp.AdminCommand) -> None:
         t = cmd.type
-        if   t == "issue_start":      await self.flow.issue_start(cmd.seat, cmd.name)
-        elif t == "issue_tag":        await self.flow.issue_tag()
-        elif t == "entry_start":      await self.flow.entry_start()
-        elif t == "entry_tag":        await self.flow.entry_tag()
-        elif t == "return_start":     await self.flow.return_start()
-        elif t == "return_tag":       await self.flow.return_tag()
-        elif t == "cancel":           await self.flow.cancel()
-        elif t == "list_active":      await self.flow.list_active()
-        elif t == "toggle":           await self.toggles.toggle(cmd.layer, cmd.mock)
-        elif t == "io_connect":       await self.devices.connect(cmd.port)
-        elif t == "io_disconnect":    await self.devices.disconnect()
-        elif t == "io_refresh_ports": await self.devices.refresh_ports()
-        else:                         log.warning("알 수 없는 admin 메시지: %s", t)
+        if t == "issue_start":
+            await self.flow.issue_start(cmd.seat, cmd.name)
+        elif t == "issue_tag":
+            await self.flow.issue_tag()
+        elif t == "entry_start":
+            await self.flow.entry_start()
+        elif t == "entry_tag":
+            await self.flow.entry_tag()
+        elif t == "return_start":
+            await self.flow.return_start()
+        elif t == "return_tag":
+            await self.flow.return_tag()
+        elif t == "cancel":
+            await self.flow.cancel()
+        elif t == "list_active":
+            await self.flow.list_active()
+        elif t == "toggle":
+            await self.toggles.toggle(cmd.layer, cmd.mock)
+        elif t == "io_connect":
+            await self.devices.connect(cmd.port)
+        elif t == "io_disconnect":
+            await self.devices.disconnect()
+        elif t == "io_refresh_ports":
+            await self.devices.refresh_ports()
+        else:
+            log.warning("알 수 없는 admin 메시지: %s", t)

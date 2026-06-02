@@ -2,12 +2,18 @@
 from __future__ import annotations
 
 from faceticket.adapters.face.facenet import FacenetRecognizer
+from faceticket.adapters.face.stub import HashStubRecognizer
 from faceticket.application.ports import IFaceRecognizer
 from faceticket.config import Settings
 
 
 def make_recognizer(settings: Settings) -> IFaceRecognizer:
-    """FacenetRecognizer 한 종류만 반환 — 그 안에서 ML 가능 여부 + force_stub 분기."""
+    """설정에 따라 얼굴 인식기를 생성한다.
+
+    force-stub 모드는 데모/테스트용이므로 무거운 ML 모델 로딩 자체를 피한다.
+    """
+    if settings.face_force_stub:
+        return HashStubRecognizer()
+
     rec = FacenetRecognizer()
-    rec.set_force_stub(settings.face_force_stub)
     return rec

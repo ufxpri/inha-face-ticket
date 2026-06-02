@@ -64,6 +64,7 @@ flowchart LR
 | [docs/iot-design.md](docs/iot-design.md) | 엣지 인증, 전력 관리, 멀티 프로토콜, 위변조 방어 등 IoT 관점 설계 결정 |
 | [docs/flows.md](docs/flows.md) | 발급 / 입장 / 반납 세 플로우의 단계별 시퀀스 + 상태 기계 |
 | [docs/hardware.md](docs/hardware.md) | Bill of Materials, 전원 경로, 로직 레벨, I²C 주소 맵, 전력 예산 |
+| [docs/demo-runbook.md](docs/demo-runbook.md) | 최종 시연 순서, 하드웨어 smoke, 서버 E2E, 실제 카메라/FaceNet 체크리스트 |
 | [docs/ble-protocol.md](docs/ble-protocol.md) | GATT characteristics, 2KB → 256B 청크 프로토콜, LED 효과 코드 |
 | [docs/serial-protocol.md](docs/serial-protocol.md) | 노트북 ↔ Arduino USB Serial 명령/응답 |
 | [docs/ws-protocol.md](docs/ws-protocol.md) | WebSocket 메시지 스키마 |

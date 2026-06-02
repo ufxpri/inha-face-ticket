@@ -17,6 +17,10 @@ from faceticket.config import COSINE_THRESHOLD
 log = logging.getLogger(__name__)
 
 
+def _is_disconnect_runtime_error(exc: RuntimeError) -> bool:
+    return "WebSocket is not connected" in str(exc)
+
+
 class TabletWebSocketHandler:
     def __init__(
         self,
@@ -44,6 +48,9 @@ class TabletWebSocketHandler:
                 await self._handle(data)
         except WebSocketDisconnect:
             pass
+        except RuntimeError as e:
+            if not _is_disconnect_runtime_error(e):
+                log.exception("/ws/tablet")
         except Exception:
             log.exception("/ws/tablet")
         finally:
