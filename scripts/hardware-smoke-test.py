@@ -28,6 +28,7 @@ from faceticket.config import ble_uuids, led_codes  # noqa: E402
 
 SERIAL_DEFAULT_COMMANDS = ["PING", "DENY", "WAKE", "CLEAR"]
 SERIAL_PASS_COMMANDS = ["PING", "PASS", "DENY", "WAKE", "CLEAR"]
+SERIAL_OPERATOR_COMMANDS = ["PING", "DENY", "WAKE", "CLEAR", "PASS"]
 SERIAL_COMMANDS = {"PING", "PASS", "DENY", "WAKE", "CLEAR"}
 
 LED_CHOICES = {
@@ -89,8 +90,13 @@ def drain_startup_lines(ser, startup_wait_s: float) -> list[str]:
     return lines
 
 
-def serial_expected_success(target: str, command: str, *, nfc_implemented: bool) -> bool:
-    if target == "arduino" and command in {"WAKE", "CLEAR"} and not nfc_implemented:
+def serial_expected_success(
+    target: str,
+    command: str,
+    *,
+    expect_nfc_placeholder: bool,
+) -> bool:
+    if target == "arduino" and command in {"WAKE", "CLEAR"} and expect_nfc_placeholder:
         return False
     return True
 
@@ -104,7 +110,10 @@ def run_serial(args: argparse.Namespace) -> int:
 
     commands = args.commands
     if commands is None:
-        commands = SERIAL_PASS_COMMANDS if args.include_pass else SERIAL_DEFAULT_COMMANDS
+        if args.operator:
+            commands = SERIAL_OPERATOR_COMMANDS
+        else:
+            commands = SERIAL_PASS_COMMANDS if args.include_pass else SERIAL_DEFAULT_COMMANDS
 
     invalid = [cmd for cmd in commands if cmd not in SERIAL_COMMANDS]
     if invalid:
@@ -129,7 +138,7 @@ def run_serial(args: argparse.Namespace) -> int:
             expected_ok = serial_expected_success(
                 args.target,
                 command,
-                nfc_implemented=args.nfc_implemented,
+                expect_nfc_placeholder=args.expect_nfc_placeholder,
             )
             matched = observed_ok == expected_ok
             if command == "PING":
@@ -250,9 +259,14 @@ def build_parser() -> argparse.ArgumentParser:
     serial_parser.add_argument("--target", choices=["arduino", "esp32"], default="arduino")
     serial_parser.add_argument("--include-pass", action="store_true", help="Also run PASS")
     serial_parser.add_argument(
-        "--nfc-implemented",
+        "--operator",
         action="store_true",
-        help="Expect Arduino WAKE/CLEAR to return OK instead of current ERR placeholders",
+        help="Run the server operator contract command set, including PASS",
+    )
+    serial_parser.add_argument(
+        "--expect-nfc-placeholder",
+        action="store_true",
+        help="Expect legacy Arduino WAKE/CLEAR placeholder ERR responses",
     )
     serial_parser.add_argument(
         "--commands",

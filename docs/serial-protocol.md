@@ -1,6 +1,8 @@
 # 시리얼 프로토콜
 
-운영자 장치(Arduino UNO gate 또는 ESP32-C3 팔찌 USB-CDC 직결) ↔ 서버 사이 USB 시리얼 프로토콜. **두 하드웨어 모두 동일한 통합 명령 집합을 구현**한다 — 서버는 어느 쪽이 연결돼 있는지 알 필요가 없다 (LSP).
+운영자 장치 ↔ 서버 사이 USB 시리얼 프로토콜. 서버는 현재 단일 `FT_OPERATOR_PORT` 에 연결된 장치에 아래 통합 명령 집합을 보낸다.
+
+데모 권장 구성은 **ESP32-C3 + PN5180** 을 operator NFC writer 로 사용하는 것이다. Arduino UNO는 레벨 시프터가 없을 때 PN5180 대신 물리 게이트 스켈레톤만 맡긴다.
 
 명령은 한 줄(`\n` 종료) ASCII. 응답도 한 줄 ASCII.
 서버는 `OK` 단독 또는 실패 토큰이 없는 `OK ...` 만 성공으로 처리한다. `ERR`, `timeout`, `fail`, `failed`, `error` 토큰이 포함된 응답은 실패다.
@@ -11,26 +13,38 @@
 
 | 명령  | 응답        | 의미                                                                         |
 |---|---|---|
-| `WAKE`  | `OK`        | 팔찌 BLE 광고 깨움 (gate 하드웨어: NFC trigger / 팔찌 직결: noop)             |
-| `PASS`  | `OK passed` / `OK timeout` | 통과 신호 (gate: 서보 OPEN + 초음파 통과 감지 / 팔찌: LED SUCCESS + OLED PASS) |
-| `DENY`  | `OK`        | 거부 신호 (gate: 적색 LED + 잠금 유지 / 팔찌: LED FAILURE + OLED DENY)        |
-| `CLEAR` | `OK`        | 반납 후처리 (gate: NFC 영역 0x00 기록 / 팔찌: 상태 초기화)                    |
+| `WAKE`  | `OK`        | 팔찌 BLE 광고 깨움 (PN5180 writer: NFC trigger 기록 / 팔찌 직결: noop)         |
+| `PASS`  | `OK passed` / `OK timeout` | 통과 신호 (gate: 서보 OPEN + 초음파 통과 감지 / ESP32 PN5180: demo 성공 응답) |
+| `DENY`  | `OK`        | 거부 신호                                                                    |
+| `CLEAR` | `OK`        | 반납 후처리 (PN5180 writer: NFC 영역 0x00 기록 / 팔찌 직결: 상태 초기화)       |
 | `PING`  | `OK PONG`   | 헬스 체크 — `connect` 직후 자동 호출                                          |
 
 `PASS` 응답은 `OK passed` 만 성공으로 본다. `OK timeout` 은 초음파 통과 감지 실패이므로 서버가 실패로 처리한다.
 
 ## 하드웨어별 매핑
 
-### Arduino UNO + NFC writer + 서보 게이트
+### ESP32-C3 + PN5180 NFC writer
+
+`firmware/tools/esp32-pn5180-smoke/src/main.cpp`. 레벨 시프터 없이 PN5180을 쓰는 데모 권장 operator 장치다.
+
+| 통합 명령 | 내부 동작 |
+|---|---|
+| `WAKE`  | PN5180 SPI/RF → ST25DV16K user memory block 8 에 `FTWK` 기록 후 read-back 검증 |
+| `PASS`  | 물리 게이트 없이 demo 성공 응답 `OK passed` |
+| `DENY`  | `OK` |
+| `CLEAR` | PN5180 SPI/RF → ST25DV16K user memory block 8 을 `0x00` 으로 초기화 후 read-back 검증 |
+| `PING`  | `OK PONG` |
+
+### Arduino UNO 물리 게이트 스켈레톤
 
 `firmware/arduino-gate/arduino-gate.ino`. 핀맵: SERVO=9, LED_GREEN=5, LED_RED=6, ULTRA_TRIG=7, ULTRA_ECHO=8.
 
 | 통합 명령 | 내부 동작 |
 |---|---|
-| `WAKE`  | PN5180 SPI → ST25DV16K EEPROM 에 BLE_TRIGGER 기록. 현재 스케치는 PN5180 미구현 상태라 `ERR NFC_WAKE_NOT_IMPLEMENTED` 반환 |
+| `WAKE`  | `ERR NFC_WAKE_NOT_IMPLEMENTED` |
 | `PASS`  | 녹색 LED + 서보 OPEN (90°) + 초음파 통과 감지(5s) + 서보 CLOSED |
 | `DENY`  | 적색 LED 800ms |
-| `CLEAR` | PN5180 SPI → NFC 영역 0x00 기록. 현재 스케치는 PN5180 미구현 상태라 `ERR NFC_CLEAR_NOT_IMPLEMENTED` 반환 |
+| `CLEAR` | `ERR NFC_CLEAR_NOT_IMPLEMENTED` |
 | `PING`  | `OK PONG` |
 
 ### ESP32-C3 팔찌 USB-CDC 직결
