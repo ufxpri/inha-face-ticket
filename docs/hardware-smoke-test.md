@@ -226,3 +226,59 @@ READ8
 2. ST25DV16K 태그를 PN5180 안테나 위에 둔다.
 3. PN5180 보드에서 `WAKE` 를 실행한다.
 4. ST25DV16K 보드에서 `READ8` 을 다시 실행해 `4654574B` 가 보이는지 확인한다.
+
+## 서버 E2E Demo Smoke Test
+
+위 serial/BLE 단품 smoke test 가 통과한 뒤, 실제 FastAPI 서버와 WebSocket flow 를 함께 검증한다. 이 절차는 브라우저 UI 대신 `scripts/e2e-demo-smoke.py` 가 admin/tablet WebSocket 을 직접 구동한다.
+
+전제:
+
+- ESP32-C3 + PN5180 firmware 가 operator 보드에 업로드되어 있다.
+- ESP32-C3 wristband firmware 가 팔찌 보드에 업로드되어 있다.
+- ST25DV16K 태그가 PN5180 안테나 중앙에 놓여 있다.
+- `pio device monitor`, Arduino Serial Monitor, 기존 서버 프로세스가 두 serial 포트를 점유하지 않는다.
+
+예시 포트:
+
+| 역할 | 포트 |
+|---|---|
+| ESP32-C3 + PN5180 operator | `/dev/cu.usbmodem1101` |
+| ESP32-C3 wristband BLE | `/dev/cu.usbmodem1201` |
+
+서버 실행:
+
+```bash
+FT_SSL=0 \
+FT_FACE_STUB=1 \
+FT_BLE_MOCK=0 \
+FT_OPERATOR_PORT=/dev/cu.usbmodem1101 \
+FT_PORT=8765 \
+server/.venv/bin/python server/run.py
+```
+
+다른 터미널에서 E2E smoke test 실행:
+
+```bash
+server/.venv/bin/python scripts/e2e-demo-smoke.py \
+  --base-url http://127.0.0.1:8765
+```
+
+이 스크립트는 다음 순서로 진행한다:
+
+1. admin/tablet WebSocket 연결
+2. `issue_start` → tablet capture trigger → deterministic image payload 전송 → `issue_tag`
+3. `entry_start` → `entry_tag` → tablet capture trigger → 같은 image payload 전송
+4. `return_start` → `return_tag`
+
+성공 기대값:
+
+- 발급 `complete`: `ok=true`, `flow=issue`, `wristband_id=...`, `seat=...`
+- 입장 `complete`: `ok=true`, `flow=entry`, `msg=통과`, `similarity=1.0`
+- 반납 `complete`: `ok=true`, `flow=return`, `returned=true`
+- DB 에 새 `issues` row 가 생기고, 반납 후 `returned_at` 이 채워진다.
+
+주의:
+
+- `FT_FACE_STUB=1` 은 같은 image payload 를 같은 임베딩으로 만들기 위한 데모 smoke 설정이다. 실제 카메라/FaceNet 검증은 `FT_FACE_STUB=0` 으로 별도 수행한다.
+- `complete` 메시지는 현재 서버 구현상 tablet WebSocket 으로 broadcast 된다. admin WebSocket 은 `state=done`/`state=idle` 과 log 를 받는다.
+- 기본 seat 는 `E2E-<HHMMSS>` 로 자동 생성된다. 고정 seat 를 쓰려면 `--seat E2E-01` 을 지정한다.
