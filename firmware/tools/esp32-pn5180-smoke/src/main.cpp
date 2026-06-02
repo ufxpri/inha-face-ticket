@@ -14,8 +14,12 @@
 //
 // Serial commands:
 //   PING, STATUS, RFON, RFOFF, INVENTORY, WAKE, CLEAR, PASS, DENY
+//   RGB R, RGB G, RGB B, RGB OFF
 
 #include <Arduino.h>
+#include <WiFi.h>
+#include <esp_now.h>
+#include <esp_wifi.h>
 #include <SPI.h>
 
 static const uint8_t PIN_NFC_NSS = 10;
@@ -30,6 +34,27 @@ static const uint8_t NFC_BLOCK_BYTES = 4;
 static const uint16_t NFC_TIMEOUT_MS = 900;
 static const uint8_t NFC_WAKE_PAYLOAD[NFC_BLOCK_BYTES] = {'F', 'T', 'W', 'K'};
 static const uint8_t NFC_CLEAR_PAYLOAD[NFC_BLOCK_BYTES] = {0x00, 0x00, 0x00, 0x00};
+
+static const uint8_t ESPNOW_CHANNEL = 6;
+static const uint8_t ESPNOW_BROADCAST_MAC[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+static const uint8_t RGB_PACKET_MAGIC_0 = 'F';
+static const uint8_t RGB_PACKET_MAGIC_1 = 'T';
+static const uint8_t RGB_PACKET_VERSION = 1;
+
+enum RgbCommand : uint8_t {
+  RGB_CMD_OFF = 0,
+  RGB_CMD_R = 1,
+  RGB_CMD_G = 2,
+  RGB_CMD_B = 3,
+};
+
+struct RgbPacket {
+  uint8_t magic0;
+  uint8_t magic1;
+  uint8_t version;
+  uint8_t command;
+};
+static_assert(sizeof(RgbPacket) == 4, "RgbPacket must remain 4 bytes");
 
 static const uint8_t PN5180_WRITE_REGISTER = 0x00;
 static const uint8_t PN5180_WRITE_REGISTER_OR_MASK = 0x01;
@@ -67,6 +92,56 @@ enum NfcResult {
 
 static SPISettings nfcSpiSettings(125000, MSBFIRST, SPI_MODE0);
 static String serialBuf;
+static bool espnowReady = false;
+
+static const char* rgbCommandName(RgbCommand command) {
+  if (command == RGB_CMD_R) return "R";
+  if (command == RGB_CMD_G) return "G";
+  if (command == RGB_CMD_B) return "B";
+  return "OFF";
+}
+
+static void espNowBegin() {
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
+
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("[ESPNOW] init failed");
+    return;
+  }
+
+  esp_now_peer_info_t peer = {};
+  memcpy(peer.peer_addr, ESPNOW_BROADCAST_MAC, sizeof(ESPNOW_BROADCAST_MAC));
+  peer.channel = ESPNOW_CHANNEL;
+  peer.encrypt = false;
+  peer.ifidx = WIFI_IF_STA;
+
+  if (!esp_now_is_peer_exist(ESPNOW_BROADCAST_MAC) && esp_now_add_peer(&peer) != ESP_OK) {
+    Serial.println("[ESPNOW] broadcast peer failed");
+    return;
+  }
+
+  espnowReady = true;
+  Serial.printf("[ESPNOW] ready channel=%u mac=%s\n", ESPNOW_CHANNEL, WiFi.macAddress().c_str());
+}
+
+static bool sendRgbCommand(RgbCommand command) {
+  if (!espnowReady) return false;
+
+  RgbPacket packet = {
+      RGB_PACKET_MAGIC_0,
+      RGB_PACKET_MAGIC_1,
+      RGB_PACKET_VERSION,
+      (uint8_t)command,
+  };
+  return esp_now_send(ESPNOW_BROADCAST_MAC, (const uint8_t*)&packet, sizeof(packet)) == ESP_OK;
+}
+
+static void pollWebRgbButtonEvents() {
+  // Web integration placeholder:
+  // call sendRgbCommand(RGB_CMD_R/G/B) when the admin R/G/B button event is received.
+}
 
 static void nfcBegin() {
   pinMode(PIN_NFC_NSS, OUTPUT);
@@ -415,6 +490,14 @@ static void handleCommand(String cmd) {
     Serial.println("OK passed");
   } else if (cmd == "DENY") {
     Serial.println("OK");
+  } else if (cmd == "RGB R" || cmd == "LED R" || cmd == "R") {
+    Serial.println(sendRgbCommand(RGB_CMD_R) ? "OK RGB=R" : "ERR ESPNOW_SEND_FAILED");
+  } else if (cmd == "RGB G" || cmd == "LED G" || cmd == "G") {
+    Serial.println(sendRgbCommand(RGB_CMD_G) ? "OK RGB=G" : "ERR ESPNOW_SEND_FAILED");
+  } else if (cmd == "RGB B" || cmd == "LED B" || cmd == "B") {
+    Serial.println(sendRgbCommand(RGB_CMD_B) ? "OK RGB=B" : "ERR ESPNOW_SEND_FAILED");
+  } else if (cmd == "RGB OFF" || cmd == "LED OFF" || cmd == "OFF") {
+    Serial.println(sendRgbCommand(RGB_CMD_OFF) ? "OK RGB=OFF" : "ERR ESPNOW_SEND_FAILED");
   } else {
     Serial.printf("ERR UNKNOWN %s\n", cmd.c_str());
   }
@@ -424,11 +507,14 @@ void setup() {
   Serial.begin(115200);
   delay(300);
   nfcBegin();
+  espNowBegin();
   serialBuf.reserve(64);
   Serial.println("READY ESP32_PN5180_SMOKE");
 }
 
 void loop() {
+  pollWebRgbButtonEvents();
+
   while (Serial.available() > 0) {
     char c = (char)Serial.read();
     if (c == '\r') continue;
