@@ -73,10 +73,8 @@ class ToggleService:
             "tablet_clients":   self._tablet_count(),
             "cosine_threshold": COSINE_THRESHOLD,
             "available_ports":  list_serial_ports(),
-            "device_status":    {
-                "connected": self.device.is_connected,
-                "port":      self.device.port,
-            },
+            # 역할별 상태 — { "nfc": {connected, port}, "gate": {connected, port} }
+            "devices":          self.device.status_snapshot(),
         }
 
     async def broadcast_flags(self) -> None:

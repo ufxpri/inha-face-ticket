@@ -9,6 +9,7 @@ from faceticket.adapters.web import ws_protocol as wp
 from faceticket.adapters.web.client_pool import ClientPool
 from faceticket.application.device_service import DeviceService
 from faceticket.application.flow_runner import FlowRunner
+from faceticket.application.ports import ROLE_NFC
 from faceticket.application.toggle_service import ToggleService
 
 log = logging.getLogger(__name__)
@@ -71,9 +72,9 @@ class AdminWebSocketHandler:
         elif t == "toggle":
             await self.toggles.toggle(cmd.layer, cmd.mock)
         elif t == "io_connect":
-            await self.devices.connect(cmd.port)
+            await self.devices.connect(cmd.port, cmd.role or ROLE_NFC)
         elif t == "io_disconnect":
-            await self.devices.disconnect()
+            await self.devices.disconnect(cmd.role or ROLE_NFC)
         elif t == "io_refresh_ports":
             await self.devices.refresh_ports()
         else:

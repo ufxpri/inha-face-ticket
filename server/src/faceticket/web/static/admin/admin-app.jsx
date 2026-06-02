@@ -32,8 +32,8 @@ function AdminApp() {
 
   const actCancel = useCallback(() => send({ type: 'cancel' }), [send]);
   const toggleLayer = useCallback((layer, newMock) => send({ type: 'toggle', layer, mock: newMock }), [send]);
-  const ioConnect    = useCallback(port => send({ type: 'io_connect', port }), [send]);
-  const ioDisconnect = useCallback(() => send({ type: 'io_disconnect' }), [send]);
+  const ioConnect    = useCallback((role, port) => send({ type: 'io_connect', role, port }), [send]);
+  const ioDisconnect = useCallback(role => send({ type: 'io_disconnect', role }), [send]);
   const ioRefresh    = useCallback(() => send({ type: 'io_refresh_ports' }), [send]);
 
   const timeStr = `${String(s.now.getHours()).padStart(2,'0')}:${String(s.now.getMinutes()).padStart(2,'0')}`;

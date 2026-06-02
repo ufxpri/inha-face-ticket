@@ -34,7 +34,11 @@ function AdminLive({ t, state }) {
   const btn2En = state.mode === 'issue' ? '② WRISTBAND TAGGED · BLE 기록'
               : state.mode === 'entry' ? '② WRISTBAND TAGGED · 인증 진행'
               : '② WRISTBAND TAGGED · 초기화';
-  const ioReady = !!state.flags.deviceStatus.connected;
+  const devices = state.flags.devices || {};
+  const nfcStatus  = devices.nfc  || { connected: false, port: null };
+  const gateStatus = devices.gate || { connected: false, port: null };
+  // NFC 리더가 모든 플로우의 진입(wake) 조건 — 이게 연결돼야 절차 시작 가능. 게이트는 입장 전용.
+  const ioReady = !!nfcStatus.connected;
   const btn1Enabled = state.fsmState === 'idle' && ioReady;
   const btn2Enabled = state.fsmState === 'await_tag';
   const focusedSeat = state.mode === 'issue';
@@ -161,17 +165,32 @@ function AdminLive({ t, state }) {
           <SectionHeading t={t} num="04" en="DEVICE · 장치 연결" ko="" />
           <div>
             <DevicePanel t={t}
-              status={state.flags.deviceStatus}
+              role="nfc" label="NFC 리더 · ESP32"
+              status={nfcStatus}
               ports={state.flags.availablePorts}
               busy={state.fsmState !== 'idle'}
               onConnect={state.ioConnect}
               onDisconnect={state.ioDisconnect}
               onRefresh={state.ioRefresh} />
-            {!state.flags.deviceStatus.connected && (
+            <DevicePanel t={t}
+              role="gate" label="입장 게이트 · UNO"
+              status={gateStatus}
+              ports={state.flags.availablePorts}
+              busy={state.fsmState !== 'idle'}
+              onConnect={state.ioConnect}
+              onDisconnect={state.ioDisconnect}
+              onRefresh={state.ioRefresh} />
+            {!nfcStatus.connected && (
               <div style={{
                 fontFamily: t.monoFamily, fontSize: 10.5, color: t.accent,
                 letterSpacing: 1.2, marginTop: 4,
-              }}>장치를 연결하지 않으면 절차 시작 불가</div>
+              }}>NFC 리더를 연결하지 않으면 절차 시작 불가</div>
+            )}
+            {nfcStatus.connected && !gateStatus.connected && (
+              <div style={{
+                fontFamily: t.monoFamily, fontSize: 10.5, color: t.mute,
+                letterSpacing: 1.2, marginTop: 4,
+              }}>입장 게이트 미연결 — 입장 PASS/DENY 신호는 동작하지 않음</div>
             )}
           </div>
 

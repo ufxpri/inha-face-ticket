@@ -1,8 +1,8 @@
 window.FT = window.FT || {};
 FT.molecules = FT.molecules || {};
 
-// DevicePanel — 단일 운영자 장치 시리얼 연결 카드. SIM 폴백을 항상 제공.
-function DevicePanel({ t, status, ports, busy, onConnect, onDisconnect, onRefresh }) {
+// DevicePanel — 역할별(NFC 리더 / 입장 게이트) 시리얼 연결 카드. SIM 폴백을 항상 제공.
+function DevicePanel({ t, role, label, status, ports, busy, onConnect, onDisconnect, onRefresh }) {
   const { useState, useEffect } = React;
   const SIM_OPT = { device: 'SIM', description: '가상 시뮬레이션 (시리얼 미사용)', vid_pid: '' };
   const allPorts = [SIM_OPT, ...ports];
@@ -29,7 +29,7 @@ function DevicePanel({ t, status, ports, busy, onConnect, onDisconnect, onRefres
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <span style={{ fontFamily: t.monoFamily, fontSize: 11, letterSpacing: 1.5, color: t.ink }}>
-          운영자 장치 · OPERATOR
+          {label}
         </span>
         <span style={{
           fontFamily: t.monoFamily, fontSize: 10, letterSpacing: 1.5,
@@ -63,7 +63,7 @@ function DevicePanel({ t, status, ports, busy, onConnect, onDisconnect, onRefres
         }}>↻</div>
       </div>
       <div style={{ display: 'flex', gap: 4 }}>
-        <div onClick={canConnect ? () => onConnect(selected) : undefined}
+        <div onClick={canConnect ? () => onConnect(role, selected) : undefined}
              title={canConnect ? '' : tip}
              style={{
           flex: 1, padding: '6px 8px', textAlign: 'center',
@@ -74,7 +74,7 @@ function DevicePanel({ t, status, ports, busy, onConnect, onDisconnect, onRefres
           cursor: canConnect ? 'pointer' : 'not-allowed', userSelect: 'none',
           opacity: canConnect ? 1 : 0.6,
         }}>CONNECT</div>
-        <div onClick={canDisconnect ? onDisconnect : undefined}
+        <div onClick={canDisconnect ? () => onDisconnect(role) : undefined}
              style={{
           flex: 1, padding: '6px 8px', textAlign: 'center',
           background: t.surface, color: canDisconnect ? t.ink : t.mute,

@@ -70,6 +70,7 @@ class AdminCommand:
     layer: str = ""               # toggle 용 ("face" | "ble")
     mock: bool = False            # toggle 용
     port: str = ""                # io_connect 용
+    role: str = ""                # io_connect/io_disconnect 용 ("nfc" | "gate")
 
 
 def parse_admin_message(data: dict) -> AdminCommand:
@@ -81,4 +82,5 @@ def parse_admin_message(data: dict) -> AdminCommand:
         layer=str(data.get("layer", "")),
         mock=bool(data.get("mock", False)),
         port=str(data.get("port", "")),
+        role=str(data.get("role", "")).strip(),
     )

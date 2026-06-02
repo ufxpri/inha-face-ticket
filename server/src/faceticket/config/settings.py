@@ -41,7 +41,10 @@ class Settings:
     port: int = 8000
 
     # 시리얼 — 부팅 시 자동연결 (None 이면 admin UI 에서 수동)
+    # operator_port: 통합/SIM 폴백 (두 역할을 같은 포트로). nfc/gate: 역할별 분리 연결.
     auto_connect_operator_port: Optional[str] = None
+    auto_connect_nfc_port: Optional[str] = None
+    auto_connect_gate_port: Optional[str] = None
     serial_baud: int = 115200
 
     # BLE — True 면 bleak 가 설치돼 있어도 mock 으로 강제
@@ -62,6 +65,8 @@ class Settings:
             host=_env_str("FT_HOST", "0.0.0.0") or "0.0.0.0",
             port=_env_int("FT_PORT", 8000),
             auto_connect_operator_port=_env_str("FT_OPERATOR_PORT"),
+            auto_connect_nfc_port=_env_str("FT_NFC_PORT"),
+            auto_connect_gate_port=_env_str("FT_GATE_PORT"),
             serial_baud=_env_int("FT_SERIAL_BAUD", 115200),
             ble_mock=_env_bool("FT_BLE_MOCK", True),
             face_force_stub=_env_bool("FT_FACE_STUB", False),

@@ -61,7 +61,10 @@ class FakeSerial:
         return self.response
 
 
-async def test_send_ok_uses_temporary_serial_timeout_and_restores_default() -> None:
+async def test_send_ok_never_mutates_port_timeout() -> None:
+    # Windows pyserial 은 ser.timeout 재설정 시 _reconfigure_port(SetCommState)로 DTR 을 토글해
+    # Arduino 를 재리셋/명령 손상시킨다. 그래서 명령별 timeout_s 가 와도 포트 timeout 은 건드리지
+    # 않고(열 때 1회 설정값 유지) 데드라인은 파이썬 read 루프로만 처리해야 한다.
     transport = SerialTransport("TEST")
     fake = FakeSerial()
     transport._ser = fake
@@ -70,5 +73,5 @@ async def test_send_ok_uses_temporary_serial_timeout_and_restores_default() -> N
     assert await transport.send_ok("PASS", timeout_s=7.0) is True
 
     assert fake.writes == [b"PASS\n"]
-    assert fake.timeout_seen_during_read == 7.0
     assert fake.timeout == 2.0
+    assert fake.timeout_seen_during_read == 2.0   # 읽는 동안에도 원래 값 그대로

@@ -74,8 +74,10 @@ python run.py
 | `FT_SSL` | `1` | `0`/`false` 로 두면 평문 HTTP |
 | `FT_SSL_CERT` | (자동) | PEM 인증서 경로 — 미지정 시 `server/certs/server.crt` 사용/생성 |
 | `FT_SSL_KEY` | (자동) | PEM 비밀키 경로 — 미지정 시 `server/certs/server.key` 사용/생성 |
-| `FT_OPERATOR_PORT` | (없음) | 운영자 장치 시리얼 포트 (예: `COM5` / `/dev/ttyACM0` / `SIM`). 미지정 시 부팅 직후 자동연결 생략 — 운영자 UI 에서 수동 선택 |
-| `FT_SERIAL_BAUD` | `115200` | 운영자 장치 시리얼 보드레이트 |
+| `FT_OPERATOR_PORT` | (없음) | **통합/SIM 폴백** — NFC·게이트 두 역할을 같은 포트로 자동연결 (예: `SIM`). 실제 COM 은 같은 포트를 두 번 못 여니 SIM 데모용에 가깝다. `FT_NFC_PORT`/`FT_GATE_PORT` 가 하나라도 지정되면 무시됨 |
+| `FT_NFC_PORT` | (없음) | **NFC 리더(ESP32+PN5180)** 시리얼 포트 — `WAKE`/`CLEAR` 라우팅 대상 (예: `COM5` / `/dev/ttyACM0` / `SIM`) |
+| `FT_GATE_PORT` | (없음) | **입장 게이트(Arduino UNO)** 시리얼 포트 — `PASS`/`DENY` 라우팅 대상 (예: `COM6` / `SIM`) |
+| `FT_SERIAL_BAUD` | `115200` | 운영자 장치 시리얼 보드레이트 (두 역할 공통) |
 | `FT_BLE_MOCK` | `1` | `0` 으로 두면 실제 bleak BLE central 사용. 기본은 mock 팔찌 (BLE 동글 없이도 동작) |
 | `FT_FACE_STUB` | `0` | `1` 이면 `facenet-pytorch` 가 설치돼 있어도 stub 임베딩 강제 — 모델 로딩 시간 회피 / 결정적 테스트용 |
 
@@ -90,9 +92,17 @@ FT_SSL=0 FT_OPERATOR_PORT=SIM FT_BLE_MOCK=1 python run.py
 # 하드웨어 없이 발급 데모: SIM serial + mock BLE + face stub
 FT_SSL=0 FT_OPERATOR_PORT=SIM FT_BLE_MOCK=1 FT_FACE_STUB=1 python run.py
 
-# 4443 포트, 실제 bleak BLE, 실제 시리얼 (COM5)
-FT_PORT=4443 FT_BLE_MOCK=0 FT_OPERATOR_PORT=COM5 python run.py
+# NFC 리더(ESP32)와 입장 게이트(UNO)를 서로 다른 COM 포트로 분리 운용
+FT_BLE_MOCK=0 FT_NFC_PORT=COM5 FT_GATE_PORT=COM6 python run.py
+
+# 게이트는 아직 없고 NFC 리더만 붙인 상태 (PASS/DENY 는 자동으로 graceful 실패)
+FT_NFC_PORT=COM5 python run.py
 ```
+
+> **운영자 장치 = NFC 리더 + 입장 게이트 2-포트.** 서버는 명령을 역할별로 라우팅한다:
+> `WAKE`/`CLEAR` → NFC(ESP32+PN5180), `PASS`/`DENY` → 게이트(UNO 서보/초음파). NFC 리더는
+> 모든 플로우의 진입(wake) 조건이라 미연결 시 절차 시작이 막히고, 게이트는 입장 전용이라
+> 미연결이어도 PASS/DENY 만 graceful 실패한다. 운영자 UI 에 두 역할 연결 카드가 따로 있다.
 
 PowerShell 에서는 `$env:FT_PORT=4443; python run.py`.
 
