@@ -580,17 +580,6 @@ void setup() {
 
 // ── USB-CDC 디버그 명령 ───────────────────────────────────────
 //   PING->OK PONG, RGB R/G/B/OFF 수동, MODE(현재 모드 출력)
-static void applyLedEffect(uint8_t code) {
-  g_last_led = code;
-  for (int i = 0; i < (code & 0x07); i++) {
-    digitalWrite(PIN_LED, LOW);  delay(60);
-    digitalWrite(PIN_LED, HIGH); delay(60);
-  }
-  digitalWrite(PIN_LED, g_connected ? LOW : HIGH);
-  applyRgbCommand(ledCodeToRgb(code));
-  oledDraw();
-}
-
 static String g_cdc_buf = "";
 
 static const char* modeName() {
@@ -604,19 +593,7 @@ static void handleCdcLine(const String& raw) {
   cmd.toUpperCase();
   if (cmd.length() == 0) return;
 
-  if (cmd == "WAKE") {
-    digitalWrite(PIN_LED, LOW); delay(40);
-    digitalWrite(PIN_LED, g_connected ? LOW : HIGH);
-    Serial.println("OK");
-  } else if (cmd == "PASS") {
-    applyLedEffect(0x01);
-    Serial.println("OK");
-  } else if (cmd == "DENY") {
-    applyLedEffect(0x02);
-    Serial.println("OK");
-  } else if (cmd == "CLEAR") {
-    Serial.println("OK");
-  } else if (cmd == "PING") {
+  if (cmd == "PING") {
     Serial.println("OK PONG");
   } else if (cmd == "MODE") {
     Serial.printf("OK MODE=%s\n", modeName());
@@ -624,10 +601,6 @@ static void handleCdcLine(const String& raw) {
     // 디버그: 리더 없이 ESP-NOW→BLE 강제 전환 (라디오 재init 안정성 테스트용). loop 컨텍스트라 안전.
     if (g_mode == MODE_ESPNOW) { enterBleMode(); Serial.println("OK GOBLE"); }
     else Serial.println("OK ALREADY-BLE");
-  } else if (cmd == "GOESPNOW") {
-    // 디버그: BLE→ESP-NOW 강제 복귀.
-    if (g_mode == MODE_BLE) { enterEspnowMode(); Serial.println("OK GOESPNOW"); }
-    else Serial.println("OK ALREADY-ESPNOW");
   } else if (cmd == "TRIGNFC") {
     // 디버그: 리더 없이 NFC 트리거 시뮬레이션 — block8 에 FTWK 직접 write → loop 폴링이 감지해 전환.
     bool ok = st25WriteBytes(NFC_TRIGGER_BYTE_ADDR, NFC_WAKE_PAYLOAD, NFC_BLOCK_BYTES);

@@ -24,23 +24,20 @@ function AdminApp() {
     }
   }, [s.mode, send, s.fillRandomIfEmpty]);
 
-  const actTag = useCallback(() => {
-    if (s.mode === 'issue')       send({ type: 'issue_tag' });
-    else if (s.mode === 'entry')  send({ type: 'entry_tag' });
-    else if (s.mode === 'return') send({ type: 'return_tag' });
-  }, [s.mode, send]);
-
   const actCancel = useCallback(() => send({ type: 'cancel' }), [send]);
   const toggleLayer = useCallback((layer, newMock) => send({ type: 'toggle', layer, mock: newMock }), [send]);
   const ioConnect    = useCallback((role, port) => send({ type: 'io_connect', role, port }), [send]);
   const ioDisconnect = useCallback(role => send({ type: 'io_disconnect', role }), [send]);
   const ioRefresh    = useCallback(() => send({ type: 'io_refresh_ports' }), [send]);
+  const ledSend = useCallback(command => send({ type: 'led', command }), [send]);
+  const ledStop = useCallback(() => send({ type: 'led_stop' }), [send]);
 
   const timeStr = `${String(s.now.getHours()).padStart(2,'0')}:${String(s.now.getMinutes()).padStart(2,'0')}`;
   const state = {
     ...s, wsOk, tabletClients: 1, timeStr,
-    actStart, actTag, actCancel, toggleLayer,
+    actStart, actCancel, toggleLayer,
     ioConnect, ioDisconnect, ioRefresh,
+    ledSend, ledStop,
   };
 
   return (

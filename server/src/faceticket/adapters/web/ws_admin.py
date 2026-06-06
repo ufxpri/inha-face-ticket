@@ -15,10 +15,6 @@ from faceticket.application.toggle_service import ToggleService
 log = logging.getLogger(__name__)
 
 
-def _is_disconnect_runtime_error(exc: RuntimeError) -> bool:
-    return "WebSocket is not connected" in str(exc)
-
-
 class AdminWebSocketHandler:
     def __init__(
         self,
@@ -44,7 +40,7 @@ class AdminWebSocketHandler:
         except WebSocketDisconnect:
             pass
         except RuntimeError as e:
-            if not _is_disconnect_runtime_error(e):
+            if not wp.is_disconnect_runtime_error(e):
                 log.exception("/ws/admin")
         except Exception:
             log.exception("/ws/admin")
@@ -53,18 +49,13 @@ class AdminWebSocketHandler:
 
     async def _dispatch(self, cmd: wp.AdminCommand) -> None:
         t = cmd.type
+        # 팔찌 태그 단계는 자동 진입(서버 주도) — 별도 *_tag 메시지는 받지 않는다.
         if t == "issue_start":
             await self.flow.issue_start(cmd.seat, cmd.name)
-        elif t == "issue_tag":
-            await self.flow.issue_tag()
         elif t == "entry_start":
             await self.flow.entry_start()
-        elif t == "entry_tag":
-            await self.flow.entry_tag()
         elif t == "return_start":
             await self.flow.return_start()
-        elif t == "return_tag":
-            await self.flow.return_tag()
         elif t == "cancel":
             await self.flow.cancel()
         elif t == "list_active":

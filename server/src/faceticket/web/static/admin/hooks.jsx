@@ -27,6 +27,7 @@ function useAdminWebSocket({ appendLog, onState, onFlags, onEmbedding }) {
           bleAvailable: !!m.ble_available,
           devices,
           availablePorts: Array.isArray(m.available_ports) ? m.available_ports : [],
+          ledPattern: m.led_pattern || '',
         });
         if (m.type === 'hello') {
           const fmt = (label, d) => d && d.connected ? `${label}@${d.port}` : `${label}-`;
@@ -67,6 +68,7 @@ function useAdminState() {
       gate: { connected: false, port: null },
     },
     availablePorts: [],
+    ledPattern: '',
   });
   const [seq, setSeq] = _useState(188);
   const [lastEmbedding, setLastEmbedding] = _useState(null);

@@ -31,9 +31,10 @@ HANDSHAKE_ATTEMPTS = 8
 HANDSHAKE_INTERVAL_S = 0.35
 HANDSHAKE_PING_TIMEOUT_S = 0.6
 
-# wake 폴링 — 운영자가 TAGGED 누른 뒤 팔찌(ST25DV)를 리더에 댈 여유. NFC_NO_TAG 는
+# wake 폴링 — 절차가 자동으로 팔찌 대기에 진입한 뒤 운영자가 팔찌(ST25DV)를 리더에 댈 여유.
+# 자동 진입(버튼 제거)이라 사람이 팔찌를 가져다 대는 시간을 넉넉히 줘야 함. NFC_NO_TAG 는
 # '아직 안 댐'이라 재시도, RF/READER/VERIFY 등 하드웨어 오류는 무한 대기 무의미라 즉시 실패.
-WAKE_WAIT_TIMEOUT_S = 5.0
+WAKE_WAIT_TIMEOUT_S = 15.0
 WAKE_POLL_INTERVAL_S = 0.3
 NFC_NO_TAG_TOKEN = "NO_TAG"
 
@@ -92,9 +93,6 @@ class OperatorDevice(IOperatorDevice):
     def status_snapshot(self) -> dict:
         st = {"connected": self.is_connected, "port": self.port}
         return {ROLE_NFC: st, ROLE_GATE: st}
-
-    async def wake_wristband(self) -> bool:
-        return await self._t.send_ok("WAKE")
 
     async def wake_wristband_wait(self, *, timeout_s: float = WAKE_WAIT_TIMEOUT_S) -> bool:
         """태그가 RF 필드에 들어올 때까지 WAKE 를 폴링.

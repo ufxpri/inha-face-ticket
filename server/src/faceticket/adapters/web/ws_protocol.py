@@ -74,6 +74,11 @@ class AdminCommand:
     command: str = ""             # led 용 — 단색("RGB R/G/B/OFF") 또는 패턴("PATTERN RAINBOW" 등, LED_PATTERNS 키)
 
 
+def is_disconnect_runtime_error(exc: RuntimeError) -> bool:
+    """WS 종료 후 send 시 나는 'not connected' RuntimeError 인지 (admin/tablet 공용)."""
+    return "WebSocket is not connected" in str(exc)
+
+
 def parse_admin_message(data: dict) -> AdminCommand:
     """raw dict → 타입 안전 dataclass."""
     return AdminCommand(

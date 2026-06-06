@@ -4,11 +4,7 @@
     write: [u16_le offset][data <= EMBED_CHUNK]
     read : write(CHR_EMB_OFF, offset) → read(CHR_EMBEDDING) 으로 256B 반환
 
-⚠ 알려진 이슈(Windows): 이 어댑터를 **서버 프로세스(uvicorn + torch 등)** 안에서 돌리면
-   connect 는 성공하나 'services changed' 인디케이션 직후 GATT read 가 hang 한다.
-   동일 코드가 **별도 프로세스의 asyncio.run** 에서는 정상이다(scripts/ble_wristband_test.py).
-   루프 타입(Proactor/Selector)·전용 스레드로는 해결 안 됨 — 프로세스 환경 자체의 문제.
-   근본 해결책은 BLE 작업을 별도 worker 프로세스로 분리하는 것(향후 작업).
+disconnect 시 CHR_CTRL 에 제어 문자를 1회 write 해 팔찌를 BLE→ESP-NOW 모드로 복귀시킨다.
 """
 from __future__ import annotations
 

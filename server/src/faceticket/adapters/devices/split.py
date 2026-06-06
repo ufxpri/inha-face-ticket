@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 
-from faceticket.adapters.devices.operator import OperatorDevice
+from faceticket.adapters.devices.operator import WAKE_WAIT_TIMEOUT_S, OperatorDevice
 from faceticket.application.ports import ROLE_GATE, ROLE_NFC, IOperatorDevice
 
 log = logging.getLogger(__name__)
@@ -71,10 +71,7 @@ class SplitOperatorDevice(IOperatorDevice):
         self.gate.disconnect()
 
     # ── 명령 라우팅 ──────────────────────────────────────────
-    async def wake_wristband(self) -> bool:
-        return await self.nfc.wake_wristband()
-
-    async def wake_wristband_wait(self, *, timeout_s: float = 5.0) -> bool:
+    async def wake_wristband_wait(self, *, timeout_s: float = WAKE_WAIT_TIMEOUT_S) -> bool:
         return await self.nfc.wake_wristband_wait(timeout_s=timeout_s)
 
     async def clear_wristband(self) -> bool:

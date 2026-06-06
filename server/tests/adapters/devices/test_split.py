@@ -28,10 +28,6 @@ class FakeOperatorDevice:
     def disconnect(self) -> None:
         self._port = None
 
-    async def wake_wristband(self) -> bool:
-        self.calls.append("WAKE")
-        return True
-
     async def wake_wristband_wait(self, *, timeout_s: float = 5.0) -> bool:
         self.calls.append("WAKE_WAIT")
         return True
@@ -63,9 +59,8 @@ async def test_wake_wait_routes_to_nfc_device_only() -> None:
 
 async def test_nfc_commands_route_to_nfc_device_only() -> None:
     dev, nfc, gate = make_split()
-    await dev.wake_wristband()
     await dev.clear_wristband()
-    assert nfc.calls == ["WAKE", "CLEAR"]
+    assert nfc.calls == ["CLEAR"]
     assert gate.calls == []
 
 

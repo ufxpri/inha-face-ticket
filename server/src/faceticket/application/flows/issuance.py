@@ -45,17 +45,17 @@ class IssueFlow(FlowBase):
     async def on_face_captured(self, embedding: Embedding) -> None:
         self.session.embedding = embedding
         await self.presenter.emit_log(
-            "③ 얼굴 임베딩 추출 완료. 팔찌를 NFC 리더에 태그하세요."
+            "③ 얼굴 임베딩 추출 완료 — 팔찌 인식으로 자동 진입합니다."
         )
         await self.presenter.emit_state(FlowState.AWAIT_TAG)
 
-    # ── 팔찌 태그 (운영자 클릭) ───────────────────────────────
+    # ── 팔찌 태그 (얼굴 캡처 후 자동 진입) ────────────────────
     async def on_tag(self) -> IssueOutcome:
         if self.session.embedding is None:
             raise MissingEmbeddingError("얼굴 임베딩이 없습니다.")
 
         dev = self.require_device()
-        await self.presenter.emit_log("④ 팔찌를 NFC 리더에 대주세요 — wake 대기 중 (최대 5초)")
+        await self.presenter.emit_log("④ 팔찌를 NFC 리더에 대주세요 — wake 대기 중 (최대 15초)")
         if not await dev.wake_wristband_wait():
             return IssueOutcome(False, reason="wake 실패 — 장치 상태를 확인하세요.")
 
