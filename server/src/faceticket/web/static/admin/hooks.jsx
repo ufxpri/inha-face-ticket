@@ -18,17 +18,20 @@ function useAdminWebSocket({ appendLog, onState, onFlags, onEmbedding }) {
     ws.onmessage = ev => {
       const m = JSON.parse(ev.data);
       if (m.type === 'hello' || m.type === 'flags') {
-        const dev = m.device_status || { connected: false, port: null };
+        const blank = { connected: false, port: null };
+        const devices = m.devices || { nfc: blank, gate: blank };
         onFlags({
           ml: !!m.ml,
           bleMock: !!m.ble_mock,
           faceAvailable: !!m.face_available,
           bleAvailable: !!m.ble_available,
-          deviceStatus:   dev,
+          devices,
           availablePorts: Array.isArray(m.available_ports) ? m.available_ports : [],
+          ledPattern: m.led_pattern || '',
         });
         if (m.type === 'hello') {
-          const ac = dev.connected ? `operator@${dev.port}` : 'none';
+          const fmt = (label, d) => d && d.connected ? `${label}@${d.port}` : `${label}-`;
+          const ac = `${fmt('nfc', devices.nfc)} ${fmt('gate', devices.gate)}`;
           appendLog(`hello · face=${m.ml?'ML':'stub'} · ble=${m.ble_mock?'mock':'real'} · io=${ac}`);
         }
       } else if (m.type === 'log') {
@@ -60,8 +63,12 @@ function useAdminState() {
   const [flags, setFlags] = _useState({
     ml: true, bleMock: true,
     faceAvailable: true, bleAvailable: true,
-    deviceStatus:   { connected: false, port: null },
+    devices: {
+      nfc:  { connected: false, port: null },
+      gate: { connected: false, port: null },
+    },
     availablePorts: [],
+    ledPattern: '',
   });
   const [seq, setSeq] = _useState(188);
   const [lastEmbedding, setLastEmbedding] = _useState(null);

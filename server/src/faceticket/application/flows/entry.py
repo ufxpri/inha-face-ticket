@@ -37,8 +37,8 @@ class EntryFlow(FlowBase):
     async def on_tag(self) -> EntryTagResult:
         dev = self.require_device()
 
-        await self.presenter.emit_log("① wake 명령 전송 (Serial)")
-        if not await dev.wake_wristband():
+        await self.presenter.emit_log("① 팔찌를 NFC 리더에 대주세요 — wake 대기 중 (최대 15초)")
+        if not await dev.wake_wristband_wait():
             return EntryTagResult(False, "wake 실패")
 
         await self.presenter.emit_log("② BLE Central 연결 시도")

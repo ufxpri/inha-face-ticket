@@ -34,7 +34,8 @@ class ReturnFlow(FlowBase):
     async def on_tag(self) -> ReturnOutcome:
         dev = self.require_device()
 
-        if not await dev.wake_wristband():
+        await self.presenter.emit_log("팔찌를 NFC 리더에 대주세요 — wake 대기 중 (최대 15초)")
+        if not await dev.wake_wristband_wait():
             return ReturnOutcome(False, reason="wake 실패")
 
         async with self.ble_session() as connected:

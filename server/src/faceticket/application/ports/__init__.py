@@ -11,14 +11,21 @@
     nominal subtype 과 structural subtype 의 장점을 모두 활용하는 패턴이라 양쪽 다 둔다.
 """
 from faceticket.application.ports.ble_port import IBleCentral
-from faceticket.application.ports.device_port import IOperatorDevice
+from faceticket.application.ports.device_port import (
+    LED_COMMANDS,
+    LED_PATTERNS,
+    ROLE_GATE,
+    ROLE_NFC,
+    ROLES,
+    IOperatorDevice,
+)
 from faceticket.application.ports.face_port import ExtractResult, IFaceRecognizer
 from faceticket.application.ports.issue_repo import IIssueRepository, IssueRecord
 from faceticket.application.ports.presenter import IPresenter, LogLevel
 
 __all__ = [
     "IBleCentral",
-    "IOperatorDevice",
+    "IOperatorDevice", "ROLE_NFC", "ROLE_GATE", "ROLES", "LED_COMMANDS", "LED_PATTERNS",
     "ExtractResult", "IFaceRecognizer",
     "IIssueRepository", "IssueRecord",
     "IPresenter", "LogLevel",

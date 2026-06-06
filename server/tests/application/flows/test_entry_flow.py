@@ -87,6 +87,9 @@ class FakeOperatorDevice:
         self.wake_calls += 1
         return self.wake_ok
 
+    async def wake_wristband_wait(self, *, timeout_s: float = 5.0) -> bool:
+        return await self.wake_wristband()
+
     async def signal_pass(self) -> bool:
         self.pass_calls += 1
         return self.pass_ok

@@ -3,6 +3,8 @@
 `EMBED_DIM * 4 = 2048 B` > BLE 단일 attribute 한계(512 B) 이므로 청크. payload:
     write: [u16_le offset][data <= EMBED_CHUNK]
     read : write(CHR_EMB_OFF, offset) → read(CHR_EMBEDDING) 으로 256B 반환
+
+disconnect 시 CHR_CTRL 에 제어 문자를 1회 write 해 팔찌를 BLE→ESP-NOW 모드로 복귀시킨다.
 """
 from __future__ import annotations
 
@@ -12,6 +14,7 @@ import numpy as np
 
 from faceticket.application.ports import IBleCentral
 from faceticket.config import (
+    CHR_CTRL,
     CHR_EMB_OFF,
     CHR_EMBEDDING,
     CHR_FLAG,
@@ -33,8 +36,6 @@ class BleakBleCentral(IBleCentral):
         from bleak import BleakClient as _C
         from bleak import BleakScanner as _S
 
-        self._BleakClient = None
-        self._BleakScanner = None
         self._BleakClient = _C
         self._BleakScanner = _S
         self.client = None
@@ -56,6 +57,11 @@ class BleakBleCentral(IBleCentral):
 
     async def disconnect(self) -> None:
         if self.client and self.client.is_connected:
+            try:
+                # 모드 전환 명령 — 팔찌가 BLE 종료 후 ESP-NOW 로 복귀. best-effort(연결이 곧 끊겨도 무방).
+                await self.client.write_gatt_char(CHR_CTRL, b"\x01", response=False)
+            except Exception:
+                pass
             try:
                 await self.client.disconnect()
             except Exception as e:

@@ -1,8 +1,22 @@
 # 시리얼 프로토콜
 
-운영자 장치 ↔ 서버 사이 USB 시리얼 프로토콜. 서버는 현재 단일 `FT_OPERATOR_PORT` 에 연결된 장치에 아래 통합 명령 집합을 보낸다.
+운영자 장치 ↔ 서버 사이 USB 시리얼 프로토콜. 운영자 장치는 **NFC 리더 + 입장 게이트** 두 역할로
+나뉘고, 서버(`SplitOperatorDevice`)가 명령을 역할별로 **서로 다른 시리얼 포트**에 라우팅한다:
 
-데모 권장 구성은 **ESP32-C3 + PN5180** 을 operator NFC writer 로 사용하는 것이다. Arduino UNO는 레벨 시프터가 없을 때 PN5180 대신 물리 게이트 스켈레톤만 맡긴다.
+| 명령군 | 역할 | 포트 env | 권장 하드웨어 |
+|---|---|---|---|
+| `WAKE` / `CLEAR` | **NFC** | `FT_NFC_PORT` | ESP32-C3 + PN5180 |
+| `PASS` / `DENY` | **GATE** | `FT_GATE_PORT` | Arduino UNO (서보 + 초음파) |
+| `PING` | (각 역할) | — | connect 직후 핸드셰이크 |
+
+각 보드는 **자기 역할의 명령만** 받는다. 따라서 UNO 의 `WAKE`/`CLEAR` placeholder(`ERR NFC_*`)나
+ESP32 의 `PASS`/`DENY` 스텁은 분리 운용 시 호출되지 않는다. NFC 리더는 모든 플로우의 진입(wake)
+조건이라 미연결 시 절차 시작이 막히고, 게이트는 입장 전용이라 미연결이어도 PASS/DENY 만 graceful
+실패한다.
+
+> 통합/SIM 폴백: `FT_OPERATOR_PORT` 하나만 주면 두 역할을 같은 포트에 붙인다(주로 SIM 데모용 —
+> 실제 COM 은 같은 포트를 두 번 못 연다). 한 보드가 5개 명령을 모두 구현한다면(예 esp32-pn5180-smoke)
+> 이 폴백으로 단일 보드 운용도 가능.
 
 명령은 한 줄(`\n` 종료) ASCII. 응답도 한 줄 ASCII.
 서버는 `OK` 단독 또는 실패 토큰이 없는 `OK ...` 만 성공으로 처리한다. `ERR`, `timeout`, `fail`, `failed`, `error` 토큰이 포함된 응답은 실패다.

@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from faceticket.adapters.ble import BleSwap, make_ble_swap
-from faceticket.adapters.devices import OperatorDevice
+from faceticket.adapters.devices import OperatorDevice, SplitOperatorDevice
 from faceticket.adapters.face import make_recognizer
 from faceticket.adapters.persistence import SqliteIssueRepository
 from faceticket.adapters.web.client_pool import ClientPool
@@ -55,7 +55,11 @@ def build_container(settings: Settings) -> Container:
     face = make_recognizer(settings)
     ble = make_ble_swap(settings)
     repo = SqliteIssueRepository(DB_PATH)
-    device = OperatorDevice(baud=settings.serial_baud)
+    # NFC 리더(ESP32) 와 입장 게이트(UNO) 를 각자의 시리얼 포트로 둔 2-포트 합성 장치.
+    device = SplitOperatorDevice(
+        nfc=OperatorDevice(baud=settings.serial_baud),
+        gate=OperatorDevice(baud=settings.serial_baud),
+    )
     admins = ClientPool()
     tablets = ClientPool()
     presenter = WebSocketPresenter(admins=admins, tablets=tablets)
@@ -73,6 +77,8 @@ def build_container(settings: Settings) -> Container:
         face=face, ble_swap=ble, device=device,
         session=session, presenter=presenter,
         tablet_count_provider=lambda: len(tablets),
+        # 아래 device_service 가 이 lambda 호출 시점엔 이미 존재 (late binding).
+        led_pattern_provider=lambda: device_service.led_pattern,
     )
     device_service = DeviceService(
         device=device, session=session, presenter=presenter,

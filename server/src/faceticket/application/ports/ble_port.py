@@ -4,8 +4,8 @@
     BleakBleCentral  — 실제 ESP32-C3 팔찌
     MockBleCentral   — 메모리상 가짜 상태
 
-런타임 토글은 `BleSwap` (adapters/ble/factory.py) 가 들고 다닌다. 호출 측은
-`container.ble.current.write_embedding(...)` 처럼 explicit 한 dispatch 를 쓴다.
+런타임 토글은 `BleSwap` (adapters/ble/swap.py) 가 들고 다닌다. `BleSwap` 자체가
+`IBleCentral` 을 구현하며 현재 backend 로 매 호출을 명시적으로 forward 한다.
 """
 from __future__ import annotations
 

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Callable
 
 try:
@@ -19,6 +20,16 @@ log = logging.getLogger(__name__)
 
 SIM_PORT = "SIM"
 FAILURE_DETAILS = {"timeout", "err", "error", "fail", "failed"}
+
+# 실제 포트 오픈 직후 — 보드가 DTR auto-reset 으로 리부트할 시간을 준 뒤 부팅 잔여 바이트를 flush.
+# native USB-CDC(리셋 없는 보드)는 짧게만 안정화. 실제 깨어남 확인은 OperatorDevice 의 PING 핸드셰이크가 담당.
+OPEN_SETTLE_S = 0.4
+
+# 포트는 이 작은 폴링 타임아웃으로 한 번만 연다. 명령별 데드라인은 파이썬 read 루프로 구현하고
+# 절대 `ser.timeout` 을 재설정하지 않는다 — Windows pyserial 은 timeout 변경 시 _reconfigure_port
+# (SetCommState) 를 호출해 DTR 라인을 토글하고, 그러면 Arduino UNO 가 재리셋되거나 다음 명령 앞에
+# 쓰레기 바이트가 끼어 `ERR UNKNOWN <garbage>CMD` 로 깨진다. (실측 확인됨)
+READ_POLL_S = 0.15
 
 # 명령 → 가짜 응답 함수
 SimResponseFn = Callable[[str], str]
@@ -71,12 +82,21 @@ class SerialTransport:
             return False
         try:
             loop = asyncio.get_running_loop()
+            # 작은 폴링 타임아웃으로 한 번만 연다. 이후 timeout 을 바꾸지 않는다(위 READ_POLL_S 주석).
             ser = await loop.run_in_executor(
-                None, lambda: pyserial.Serial(port, self._baud, timeout=self._timeout_s)
+                None, lambda: pyserial.Serial(port, self._baud, timeout=READ_POLL_S)
             )
             self._ser = ser
             self._port = port
             log.info("[%s] %s @ %d 연결", self.name, port, self._baud)
+            # DTR auto-reset 리부트 안정화 + 부팅 로그 잔여 바이트 제거.
+            # (안 하면 첫 명령이 부팅 텍스트 한 줄을 응답으로 오독 → 실패)
+            await asyncio.sleep(OPEN_SETTLE_S)
+            try:
+                await loop.run_in_executor(None, ser.reset_input_buffer)
+                await loop.run_in_executor(None, ser.reset_output_buffer)
+            except Exception:
+                pass
             return True
         except Exception as e:
             log.warning("[%s] %s 열기 실패: %s", self.name, port, e)
@@ -101,6 +121,21 @@ class SerialTransport:
         self._port = None
 
     # ── 송수신 ───────────────────────────────────────────────
+    def _read_line(self, deadline_s: float) -> bytes:
+        """포트 timeout(READ_POLL_S)을 바꾸지 않고, 한 줄(\\n/\\r) 또는 deadline 까지 누적 read.
+
+        `ser.timeout` 재설정이 Arduino 를 글리치시키므로(READ_POLL_S 주석) 데드라인은 여기서만 처리.
+        """
+        end = time.monotonic() + deadline_s
+        buf = bytearray()
+        while time.monotonic() < end:
+            chunk = self._ser.readline()         # \n 까지 또는 READ_POLL_S 후 반환
+            if chunk:
+                buf += chunk
+                if buf.endswith(b"\n") or buf.endswith(b"\r"):
+                    break
+        return bytes(buf)
+
     async def send(self, line: str, *, timeout_s: float | None = None) -> str:
         """한 줄 송신 → 한 줄 응답. 미연결이면 RuntimeError."""
         if self._sim:
@@ -110,18 +145,20 @@ class SerialTransport:
             return resp
         if self._ser is None:
             raise RuntimeError(f"{self.name} 미연결")
+        deadline = self._timeout_s if timeout_s is None else timeout_s
+
+        def _io() -> bytes:
+            # 직전 명령의 지각 응답·비동기 부팅 로그 등 잔여 입력을 버리고 깨끗한 1-req/1-resp 보장.
+            try:
+                self._ser.reset_input_buffer()
+            except Exception:
+                pass
+            self._ser.write((line + "\n").encode("ascii", "ignore"))
+            return self._read_line(deadline)
+
         async with self._lock:
             loop = asyncio.get_running_loop()
-            old_timeout = self._ser.timeout
-            if timeout_s is not None:
-                self._ser.timeout = timeout_s
-            try:
-                await loop.run_in_executor(
-                    None, self._ser.write, (line + "\n").encode("ascii", "ignore")
-                )
-                raw = await loop.run_in_executor(None, self._ser.readline)
-            finally:
-                self._ser.timeout = old_timeout
+            raw = await loop.run_in_executor(None, _io)
         return raw.decode("ascii", errors="replace").strip()
 
     async def send_ok(
