@@ -113,6 +113,12 @@ static bool     g_connected   = false;
 static uint16_t g_read_off    = 0;
 static uint8_t  g_last_rgb    = RGB_CMD_OFF;
 
+// 알림 LED(등록/입장/반납 시 BLE 로 받은 효과)는 3초만 유지하고 OFF 로 제어권 해제 —
+// 그래야 이후 수동 RGB(ESP-NOW LED 패널) 색상이 묻히지 않는다. 수동 명령이 오면 즉시 취소.
+static bool     g_notifyLedActive = false;
+static uint32_t g_notifyLedAt     = 0;
+static const uint32_t NOTIFY_LED_HOLD_MS = 3000;
+
 static volatile bool    pendingRgbCommand = false;
 static volatile uint8_t pendingRgbValue   = RGB_CMD_OFF;
 static portMUX_TYPE     rgbMux = portMUX_INITIALIZER_UNLOCKED;
@@ -130,6 +136,9 @@ static void applyRgbCommand(uint8_t command) {
   digitalWrite(PIN_RGB_G, command == RGB_CMD_G ? HIGH : LOW);
   digitalWrite(PIN_RGB_B, command == RGB_CMD_B ? HIGH : LOW);
   g_last_rgb = command;
+  // 어떤 직접 RGB 세팅이든 알림 LED 제어권을 해제한다. 알림(LedCB) 경로는 이 호출
+  // 직후 g_notifyLedActive 를 다시 무장하므로 영향 없음.
+  g_notifyLedActive = false;
 }
 
 static bool parseRgbPacket(const uint8_t* data, int len, uint8_t* command) {
@@ -412,7 +421,11 @@ class LedCB : public NimBLECharacteristicCallbacks {
     }
     digitalWrite(PIN_LED, g_connected ? LOW : HIGH);
     // RGB LED 에도 색으로 반영 (SUCCESS=G / FAILURE=R / ISSUED=B / 그 외=OFF)
-    applyRgbCommand(ledCodeToRgb(g_last_led));
+    uint8_t rgb = ledCodeToRgb(g_last_led);
+    applyRgbCommand(rgb);
+    // 알림 색이면 3초 뒤 자동 해제하도록 타이머 무장 (loop 에서 만료 처리)
+    g_notifyLedActive = (rgb != RGB_CMD_OFF);
+    g_notifyLedAt = millis();
     oledDraw();
   }
 };
@@ -636,6 +649,14 @@ static void pollCdc() {
 void loop() {
   pollCdc();
 
+  // 알림 LED 3초 만료 → OFF 로 제어권 해제 (모드 무관, RGB 핀은 라디오와 독립)
+  if (g_notifyLedActive && (millis() - g_notifyLedAt > NOTIFY_LED_HOLD_MS)) {
+    g_notifyLedActive = false;
+    applyRgbCommand(RGB_CMD_OFF);
+    oledDraw();
+    Serial.println("OK NOTIFY-LED expired -> OFF");
+  }
+
   if (g_mode == MODE_ESPNOW) {
     // ESP-NOW 로 들어온 RGB 명령 적용 (콜백에서 큐잉된 것)
     bool hasRgb = false;
@@ -648,7 +669,7 @@ void loop() {
     }
     portEXIT_CRITICAL(&rgbMux);
     if (hasRgb) {
-      applyRgbCommand(rgb);
+      applyRgbCommand(rgb);   // 수동 명령 — applyRgbCommand 가 알림 타이머 해제
       oledDraw();
       Serial.printf("OK ESPNOW RGB=%s\n", rgbCommandName(rgb));
     }
