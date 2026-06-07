@@ -119,6 +119,11 @@ static bool     g_notifyLedActive = false;
 static uint32_t g_notifyLedAt     = 0;
 static const uint32_t NOTIFY_LED_HOLD_MS = 3000;
 
+// 디버그 표시용 상태
+RTC_DATA_ATTR static uint32_t g_bootCount = 0;   // 리셋/크래시 감지(소프트리셋엔 유지)
+static String   g_lastEvent = "boot";            // 마지막 이벤트(태그/BLE연결/GATT write/RGB)
+static bool     g_hasEmb    = false;             // 임베딩 수신 여부(이번 부팅 세션)
+
 static volatile bool    pendingRgbCommand = false;
 static volatile uint8_t pendingRgbValue   = RGB_CMD_OFF;
 static portMUX_TYPE     rgbMux = portMUX_INITIALIZER_UNLOCKED;
@@ -335,22 +340,27 @@ static void espNowEnd() {
 static void oledDraw() {
   display.clearBuffer();
   display.setFont(u8g2_font_5x7_tf);
-  int y = 8;
-  // line1: 모드 / 연결 상태
-  const char* l1 = "ESPNOW";
-  if (g_mode == MODE_BLE) l1 = g_connected ? "BLE:CONN" : "BLE:ADV";
-  display.drawStr(0, y, l1);                                   y += 9;
-  // line2: ID
-  display.drawStr(0, y, g_id.c_str());                         y += 9;
-  // line3: 좌석
-  String s = "S:" + (g_seat.length() ? g_seat : String("-"));
-  display.drawStr(0, y, s.c_str());                            y += 9;
-  // line4: RGB 색 + 마지막 LED 코드
-  char ll[20];
-  snprintf(ll, sizeof(ll), "%s C:%s",
-           (g_last_led == 0xFF) ? "L:--" : (String("L:") + String(g_last_led, HEX)).c_str(),
-           rgbCommandName(g_last_rgb));
-  display.drawStr(0, y, ll);
+  char l[24];
+  // L1: 모드/실제 BLE 연결 상태 + 부팅횟수(리셋 감지). BLE:CONN = 서버가 진짜 붙은 것.
+  const char* m = "ESPNOW";
+  if (g_mode == MODE_BLE) m = g_connected ? "BLE:CONN" : "BLE:ADV";
+  snprintf(l, sizeof(l), "%s b#%lu", m, (unsigned long)g_bootCount);
+  display.drawStr(0, 7, l);
+  // L2: 팔찌 ID
+  display.drawStr(0, 15, g_id.c_str());
+  // L3: 마지막 이벤트(무슨 일이 있었나)
+  snprintf(l, sizeof(l), "ev:%s", g_lastEvent.c_str());
+  display.drawStr(0, 23, l);
+  // L4: 임베딩 보유 여부 + 좌석 (입장 '미발급' 디버깅용)
+  snprintf(l, sizeof(l), "emb:%s S:%s", g_hasEmb ? "Y" : "N",
+           g_seat.length() ? g_seat.c_str() : "-");
+  display.drawStr(0, 31, l);
+  // L5: 마지막 LED 효과 코드 + 현재 RGB 색
+  char ledbuf[6];
+  if (g_last_led == 0xFF) strcpy(ledbuf, "--");
+  else snprintf(ledbuf, sizeof(ledbuf), "%02X", g_last_led);
+  snprintf(l, sizeof(l), "L:%s R:%s", ledbuf, rgbCommandName(g_last_rgb));
+  display.drawStr(0, 39, l);
   display.sendBuffer();
 }
 
@@ -358,12 +368,14 @@ static void oledDraw() {
 class ServerCB : public NimBLEServerCallbacks {
   void onConnect(NimBLEServer* s, ble_gap_conn_desc* d) override {
     g_connected = true;
+    g_lastEvent = "BLE conn";
     Serial.println("[BLE] connected");
     digitalWrite(PIN_LED, LOW);
     oledDraw();
   }
   void onDisconnect(NimBLEServer* s) override {
     g_connected = false;
+    g_lastEvent = "BLE gone";
     Serial.println("[BLE] disconnected — ESP-NOW 모드로 복귀 예약");
     digitalWrite(PIN_LED, HIGH);
     // 광고를 재개하지 않고 ESP-NOW 모드로 빠져나간다. 실제 전환은 loop 에서.
@@ -380,6 +392,8 @@ class EmbedCB : public NimBLECharacteristicCallbacks {
     if (off >= EMBED_BYTES) return;
     if (off + dlen > EMBED_BYTES) dlen = EMBED_BYTES - off;
     memcpy(g_embedding + off, v.data() + 2, dlen);
+    g_hasEmb = true;
+    g_lastEvent = "EMB wr";
     Serial.printf("[BLE] embedding chunk off=%u len=%u\n", off, (unsigned)dlen);
   }
   void onRead(NimBLECharacteristic* c) override {
@@ -403,6 +417,7 @@ class EmbOffCB : public NimBLECharacteristicCallbacks {
 class SeatCB : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* c) override {
     g_seat = String(c->getValue().c_str());
+    g_lastEvent = "SEAT";
     Serial.printf("[BLE] seat write: %s\n", g_seat.c_str());
     oledDraw();
   }
@@ -413,6 +428,7 @@ class LedCB : public NimBLECharacteristicCallbacks {
     std::string v = c->getValue();
     if (v.empty()) return;
     g_last_led = (uint8_t)v[0];
+    g_lastEvent = "LED";
     Serial.printf("[BLE] LED effect: 0x%02X\n", g_last_led);
     // 온보드 LED 깜빡 (코드 하위 3비트 횟수)
     for (int i = 0; i < (g_last_led & 0x07); i++) {
@@ -441,6 +457,7 @@ class FlagCB : public NimBLECharacteristicCallbacks {
 class CtrlCB : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* c) override {
     (void)c;
+    g_lastEvent = "CTRL end";
     Serial.println("[BLE] CTRL write — ESP-NOW 모드로 복귀 예약");
     g_switchToEspnow = true;
   }
@@ -532,6 +549,7 @@ static void bleEnd() {
 // ── 모드 전환 (loop 에서만 호출) ──────────────────────────────
 static void enterBleMode() {
   Serial.println("[MODE] ESPNOW->BLE");
+  g_lastEvent = "NFC->BLE";
   espNowEnd();
   bleBegin();
   g_mode          = MODE_BLE;
@@ -552,6 +570,7 @@ static void enterEspnowMode() {
 void setup() {
   Serial.begin(115200);
   delay(200);
+  g_bootCount++;                  // 리셋/크래시마다 증가 — OLED b# 로 확인
 
   pinMode(PIN_LED, OUTPUT);
   digitalWrite(PIN_LED, HIGH);   // OFF (active-low)
@@ -670,6 +689,7 @@ void loop() {
     portEXIT_CRITICAL(&rgbMux);
     if (hasRgb) {
       applyRgbCommand(rgb);   // 수동 명령 — applyRgbCommand 가 알림 타이머 해제
+      g_lastEvent = String("RGB ") + rgbCommandName(rgb);
       oledDraw();
       Serial.printf("OK ESPNOW RGB=%s\n", rgbCommandName(rgb));
     }
