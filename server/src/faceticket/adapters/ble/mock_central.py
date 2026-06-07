@@ -31,7 +31,7 @@ class MockBleCentral(IBleCentral):
             }
         return self._state
 
-    async def connect_wristband(self, timeout: float = 15.0) -> bool:
+    async def connect_wristband(self, timeout: float = 15.0, address: Optional[str] = None) -> bool:
         await asyncio.sleep(0.3)
         self._ensure()
         log.info("팔찌 연결 시뮬레이트")

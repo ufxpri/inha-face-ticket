@@ -47,6 +47,7 @@ static const uint8_t PIN_NFC_BUSY = 20;
 static const uint8_t PIN_NFC_RST = 21;
 
 static const uint8_t NFC_TRIGGER_BLOCK = 8;
+static const uint8_t NFC_ADDR_BLOCK = 4;   // 팔찌가 적어둔 BLE 주소(block4-5) 핸드오프
 static const uint8_t NFC_BLOCK_BYTES = 4;
 static const uint16_t NFC_TIMEOUT_MS = 900;
 static const uint8_t NFC_WAKE_PAYLOAD[NFC_BLOCK_BYTES] = {'F', 'T', 'W', 'K'};
@@ -480,6 +481,39 @@ static NfcResult nfcWriteBlockWithVerify(const uint8_t payload[NFC_BLOCK_BYTES])
   return NFC_RESULT_OK;
 }
 
+// WAKE(트리거 write) + 같은 RF 세션에서 팔찌가 적어둔 BLE 주소(block4-5) read.
+// addrOut: "AABBCCDDEEFF" (magic 'F','A' 검증 실패/미존재 시 빈 문자열 → 서버가 스캔 폴백).
+static NfcResult nfcWakeAndReadAddr(char* addrOut) {
+  addrOut[0] = '\0';
+  uint8_t uid[8] = {0};
+  uint8_t verify[NFC_BLOCK_BYTES] = {0};
+
+  NfcResult started = nfcSessionBegin();
+  if (started != NFC_RESULT_OK) return started;
+  if (!nfcInventory(uid)) { nfcSessionEnd(); return NFC_RESULT_NO_TAG; }
+  if (!nfcWriteSingleBlock(uid, NFC_TRIGGER_BLOCK, NFC_WAKE_PAYLOAD)) {
+    nfcSessionEnd();
+    return NFC_RESULT_WRITE_FAILED;
+  }
+  delay(20);
+  if (!nfcReadSingleBlock(uid, NFC_TRIGGER_BLOCK, verify) ||
+      memcmp(verify, NFC_WAKE_PAYLOAD, NFC_BLOCK_BYTES) != 0) {
+    nfcSessionEnd();
+    return NFC_RESULT_VERIFY_FAILED;
+  }
+  // 주소 핸드오프 블록 read (실패해도 wake 는 성공 처리 — 서버가 스캔으로 폴백)
+  uint8_t b4[NFC_BLOCK_BYTES] = {0};
+  uint8_t b5[NFC_BLOCK_BYTES] = {0};
+  if (nfcReadSingleBlock(uid, NFC_ADDR_BLOCK, b4) &&
+      nfcReadSingleBlock(uid, NFC_ADDR_BLOCK + 1, b5) &&
+      b5[2] == 'F' && b5[3] == 'A') {
+    snprintf(addrOut, 18, "%02X%02X%02X%02X%02X%02X",
+             b4[0], b4[1], b4[2], b4[3], b5[0], b5[1]);
+  }
+  nfcSessionEnd();
+  return NFC_RESULT_OK;
+}
+
 static void printResult(NfcResult result, const char* writeFailure) {
   if (result == NFC_RESULT_OK) {
     Serial.println("OK"); setResult("OK");
@@ -528,7 +562,14 @@ static void handleCommand(String cmd) {
       printResult(result, "NFC_INVENTORY_FAILED");
     }
   } else if (cmd == "WAKE") {
-    printResult(nfcWriteBlockWithVerify(NFC_WAKE_PAYLOAD), "NFC_WAKE_FAILED");
+    char addr[18] = {0};
+    NfcResult r = nfcWakeAndReadAddr(addr);
+    if (r == NFC_RESULT_OK) {
+      if (addr[0]) { Serial.printf("OK ADDR=%s\n", addr); setResult("OK+adr"); }
+      else { Serial.println("OK"); setResult("OK"); }
+    } else {
+      printResult(r, "NFC_WAKE_FAILED");
+    }
   } else if (cmd == "CLEAR") {
     printResult(nfcWriteBlockWithVerify(NFC_CLEAR_PAYLOAD), "NFC_CLEAR_FAILED");
   } else if (cmd == "PASS") {

@@ -1,6 +1,7 @@
 """입장 플로우 — 팔찌 태그 → BLE read → 얼굴 캡처 → 코사인 비교 → 게이트 OPEN/DENY."""
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass
 
@@ -40,9 +41,10 @@ class EntryFlow(FlowBase):
         await self.presenter.emit_log("① 팔찌를 NFC 리더에 대주세요 — wake 대기 중 (최대 15초)")
         if not await dev.wake_wristband_wait():
             return EntryTagResult(False, "wake 실패")
+        await self.presenter.emit_sound("tag")   # NFC 태그 인식 — 태블릿 '삑'
 
         await self.presenter.emit_log("② BLE Central 연결 시도")
-        if not await self.ble.connect_wristband(timeout=15.0):
+        if not await self.ble.connect_wristband(timeout=15.0, address=dev.last_wristband_addr):
             return EntryTagResult(False, "BLE 연결 실패")
 
         try:
@@ -81,21 +83,21 @@ class EntryFlow(FlowBase):
 
         dev = self.device if self.device.is_connected else None   # 그 사이 disconnect 가능
         sim = cosine(self.session.embedding, live_embedding)
+        log.info("[FACE] 입장 코사인 유사도 = %.4f (임곗값 %.2f) → %s",
+                 sim, COSINE_THRESHOLD, "통과" if sim >= COSINE_THRESHOLD else "거부")
         await self.presenter.emit_log(
             f"⑤ 코사인 유사도 = {sim:.4f} (임곗값 {COSINE_THRESHOLD})"
         )
 
         try:
             if sim >= COSINE_THRESHOLD:
-                await self.presenter.emit_log("⑥ 통과 판정 — signal_pass")
-                passed = bool(dev) and await dev.signal_pass()
-                await self.ble.write_led_effect(LED_SUCCESS if passed else LED_FAILURE)
-                msg = "통과" if passed else "게이트 통과 미감지"
-                await self.presenter.emit_log(
-                    "⑦ 통과 신호 확인" if passed else "⚠ 통과 감지 타임아웃",
-                    "info" if passed else "warn",
-                )
-                return EntryFaceResult(passed, sim, msg)
+                # 얼굴 인증 성공 → 즉시 '인식 완료'. 게이트 개방/통과 감지는 결과를 막지 않고
+                # 백그라운드로 처리한다(사용자: 인식완료가 먼저 뜨고 그 다음 게이트를 통과).
+                await self.ble.write_led_effect(LED_SUCCESS)
+                await self.presenter.emit_log("⑥ 얼굴 인증 통과 — 게이트가 열립니다. 통과해 주세요")
+                if dev:
+                    asyncio.create_task(self._open_gate_and_confirm(dev))
+                return EntryFaceResult(True, sim, "인증 통과")
             else:
                 await self.presenter.emit_log("⑥ 거부 — signal_deny", "warn")
                 if dev:
@@ -104,3 +106,17 @@ class EntryFlow(FlowBase):
                 return EntryFaceResult(False, sim, "인증 실패")
         finally:
             await self._safe_ble_disconnect()
+
+    async def _open_gate_and_confirm(self, dev) -> None:
+        """게이트 개방 + 초음파 통과 확인 — 비차단. 인식완료를 먼저 알린 뒤 백그라운드로 실행.
+
+        게이트가 없거나 통과가 늦어도 인증 결과(통과)에는 영향을 주지 않는다.
+        """
+        try:
+            ok = await dev.signal_pass()
+            await self.presenter.emit_log(
+                "⑦ 게이트 통과 확인" if ok else "⑦ 게이트 미연결/통과 미감지 (인증은 통과)",
+                "info" if ok else "warn",
+            )
+        except Exception as e:
+            log.warning("게이트 개방 오류: %s", e)

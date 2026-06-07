@@ -27,6 +27,7 @@
 #include <esp_idf_version.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
+#include "esp_mac.h"
 #include <NimBLEDevice.h>
 #include <Wire.h>
 #include <U8g2lib.h>
@@ -88,6 +89,9 @@ static const uint8_t  NFC_BLOCK_BYTES   = 4;
 static const uint16_t NFC_TRIGGER_BYTE_ADDR = NFC_TRIGGER_BLOCK * NFC_BLOCK_BYTES;  // 32
 static const uint8_t  NFC_WAKE_PAYLOAD[NFC_BLOCK_BYTES]  = {'F', 'T', 'W', 'K'};
 static const uint8_t  NFC_CLEAR_PAYLOAD[NFC_BLOCK_BYTES] = {0x00, 0x00, 0x00, 0x00};
+// BLE 주소 핸드오프: block4-5(byte 16~) 에 [addr0..5][magic 'F','A'] 기록.
+// NFC 리더가 WAKE 시 이걸 read 해 노트북이 스캔 없이 그 주소로 바로 연결.
+static const uint16_t NFC_ADDR_BYTE_ADDR = 4 * NFC_BLOCK_BYTES;  // block4 = 16
 
 // SYSTEM 레지스터 주소
 static const uint16_t ST25_REG_GPO          = 0x0000;  // GPO 설정 레지스터
@@ -317,23 +321,29 @@ static void onEspNowReceive(const uint8_t* mac, const uint8_t* data, int len) {
 }
 
 static void espNowBegin() {
+  // BLE 사이클 직후엔 WiFi 상태가 어정쩡해 RX 가 안 살아난다. OFF→STA 로 깨끗이 다시 올린다.
+  WiFi.mode(WIFI_OFF);
+  delay(50);
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
+  delay(120);                                       // 라디오/드라이버 안정화
   esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
   if (esp_now_init() != ESP_OK) {
     Serial.println("[ESPNOW] init failed");
     return;
   }
   esp_now_register_recv_cb(onEspNowReceive);
+  esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);   // init 후 채널 재확정
   Serial.printf("[ESPNOW] ready channel=%u mac=%s\n", ESPNOW_CHANNEL, WiFi.macAddress().c_str());
 }
 
 static void espNowEnd() {
   esp_now_unregister_recv_cb();
   esp_now_deinit();
-  esp_wifi_stop();
-  esp_wifi_deinit();
+  // raw esp_wifi_stop/deinit 는 Arduino WiFi 상태머신과 desync 되어 복귀 시 RX 가 죽는다.
+  // 라디오 해제는 Arduino 가 관리하도록 WiFi.mode(OFF) 만 사용.
   WiFi.mode(WIFI_OFF);
+  delay(50);
 }
 
 // ── OLED ──────────────────────────────────────────────────────
@@ -546,6 +556,19 @@ static void bleEnd() {
   g_connected = false;
 }
 
+// 부팅 시 자기 BLE 주소를 ST25DV 에 적어둔다(NFC 핸드오프용). BLE init 전이라도
+// esp_read_mac(ESP_MAC_BT) 로 광고에 쓰일 BT MAC 을 얻을 수 있다(=bleak 이 보는 주소).
+static void writeBleAddrToTag() {
+  uint8_t mac[6] = {0};
+  esp_read_mac(mac, ESP_MAC_BT);
+  uint8_t blk4[NFC_BLOCK_BYTES] = {mac[0], mac[1], mac[2], mac[3]};
+  uint8_t blk5[NFC_BLOCK_BYTES] = {mac[4], mac[5], 'F', 'A'};   // 뒤 2바이트 = magic
+  st25WriteBytes(NFC_ADDR_BYTE_ADDR, blk4, NFC_BLOCK_BYTES);
+  st25WriteBytes(NFC_ADDR_BYTE_ADDR + NFC_BLOCK_BYTES, blk5, NFC_BLOCK_BYTES);
+  Serial.printf("[ST25] BLE addr 저장 %02X:%02X:%02X:%02X:%02X:%02X\n",
+                mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
+
 // ── 모드 전환 (loop 에서만 호출) ──────────────────────────────
 static void enterBleMode() {
   Serial.println("[MODE] ESPNOW->BLE");
@@ -597,6 +620,7 @@ void setup() {
 
   // ST25DV GPO: RF 쓰기 시 펄스 출력하도록 설정 (실패해도 부팅 계속)
   st25ConfigureGpo();
+  writeBleAddrToTag();   // BLE 주소 핸드오프 블록 기록
 
   // GPIO7 FALLING 인터럽트 — GPO 펄스 감지
   pinMode(PIN_GPO, INPUT_PULLUP);

@@ -90,6 +90,12 @@
       tone({ freq: 1100, dur: 0.05, gain: G.tick, type: 'triangle', ...ENV.click });
     },
 
+    // ── NFC 태그 인식 — 명료한 단일 "삑" (인식 즉시 피드백)
+    tag() {
+      ensureCtx();
+      tone({ freq: NOTES.E6, dur: 0.12, gain: 0.22, type: 'square', ...ENV.short });
+    },
+
     // ── 캡처 성공 — A5 → E6 (저→고 두 음)
     captureOk() {
       ensureCtx();

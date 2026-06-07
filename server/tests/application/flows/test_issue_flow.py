@@ -98,6 +98,9 @@ class RecordingPresenter:
     async def emit_flags(self, snapshot: dict) -> None:
         self.flags.append(snapshot)
 
+    async def emit_sound(self, kind: str) -> None:
+        pass
+
 
 class FakeOperatorDevice:
     def __init__(self, *, connected: bool = True, wake_ok: bool = True) -> None:
@@ -112,6 +115,10 @@ class FakeOperatorDevice:
     @property
     def port(self) -> str | None:
         return "FAKE" if self.connected else None
+
+    @property
+    def last_wristband_addr(self) -> str | None:
+        return None
 
     async def connect(self, port: str) -> bool:
         self.connected = True
@@ -148,7 +155,7 @@ class ControlledBleCentral:
         self.led_codes: list[int] = []
         self.wristband_id = "WB-TEST"
 
-    async def connect_wristband(self, timeout: float = 15.0) -> bool:
+    async def connect_wristband(self, timeout: float = 15.0, address: str | None = None) -> bool:
         self.connect_calls += 1
         return self.connect_ok
 
