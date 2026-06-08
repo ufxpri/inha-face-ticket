@@ -32,7 +32,7 @@ class EntryFlow(FlowBase):
     async def start(self) -> None:
         self.require_device()
         self.session.start(Flow.ENTRY)
-        await self.presenter.emit_log("입장 절차 시작 — 팔찌를 게이트 리더에 태그하세요.")
+        await self.presenter.emit_log("입장 절차 시작 — 팔찌 인식으로 자동 진입합니다.")
         await self.presenter.emit_state(FlowState.AWAIT_TAG)
 
     async def on_tag(self) -> EntryTagResult:

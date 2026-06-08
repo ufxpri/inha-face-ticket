@@ -28,7 +28,7 @@ class ReturnFlow(FlowBase):
     async def start(self) -> None:
         self.require_device()
         self.session.start(Flow.RETURN)
-        await self.presenter.emit_log("반납 절차 시작 — 팔찌를 NFC 리더에 태그하세요.")
+        await self.presenter.emit_log("반납 절차 시작 — 팔찌 인식으로 자동 진입합니다.")
         await self.presenter.emit_state(FlowState.AWAIT_TAG)
 
     async def on_tag(self) -> ReturnOutcome:
