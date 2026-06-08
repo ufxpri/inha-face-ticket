@@ -44,6 +44,9 @@ class TabletWebSocketHandler:
                 await self._handle(data)
         except WebSocketDisconnect:
             pass
+        except RuntimeError as e:
+            if not wp.is_disconnect_runtime_error(e):
+                log.exception("/ws/tablet")
         except Exception:
             log.exception("/ws/tablet")
         finally:

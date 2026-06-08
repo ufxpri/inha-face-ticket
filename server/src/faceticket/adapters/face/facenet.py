@@ -91,6 +91,7 @@ class FacenetRecognizer(IFaceRecognizer):
     def _extract_sync(self, img: Image.Image) -> np.ndarray:
         boxes, probs, lmks = self._mtcnn.detect(img, landmarks=True)
         if boxes is None or len(boxes) == 0:
+            log.info("[FACE] 얼굴 미검출 (MTCNN 결과 없음)")
             raise _ExtractFailure("얼굴 미검출 — 카메라 정면으로 와주세요")
 
         box   = boxes[0]
@@ -98,9 +99,10 @@ class FacenetRecognizer(IFaceRecognizer):
         lmk   = lmks[0]
 
         result = check_frontal(box, prob, lmk, img.width)
-        log.debug("det prob=%.3f metrics=%s -> %s",
-                  prob, {k: round(v, 3) for k, v in result.metrics.items()},
-                  "OK" if result.ok else result.reason)
+        log.info("[FACE] det prob=%.3f bbox_ratio=%.3f metrics=%s -> %s",
+                 prob, (box[2] - box[0]) / max(1, img.width),
+                 {k: round(v, 3) for k, v in result.metrics.items()},
+                 "OK" if result.ok else result.reason)
         if not result.ok:
             raise _ExtractFailure(result.reason or "정면도 검사 실패")
 

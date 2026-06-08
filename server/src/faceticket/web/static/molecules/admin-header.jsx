@@ -11,9 +11,11 @@ function AdminHeader({ t, flags, wsOk, fsmState, onToggle }) {
     { k: 'ble',    v: flags.bleMock ? 'MOCK' : 'REAL',
       toggleable: true,
       toggle: () => onToggle('ble', !flags.bleMock) },
-    { k: 'io', v: flags.deviceStatus && flags.deviceStatus.connected
-                ? `OPERATOR@${flags.deviceStatus.port || '?'}`
-                : 'DISCONNECTED',
+    { k: 'io', v: (() => {
+        const d = flags.devices || {};
+        const one = (label, s) => s && s.connected ? `${label}@${s.port || '?'}` : `${label}✗`;
+        return `${one('N', d.nfc)} ${one('G', d.gate)}`;
+      })(),
       toggleable: false },
     { k: 'ws',     v: wsOk ? 'OK' : 'DOWN', toggleable: false },
     { k: 'ntp',    v: 'SYNC', toggleable: false },

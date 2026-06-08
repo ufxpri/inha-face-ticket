@@ -16,3 +16,7 @@ class MissingDeviceError(DomainError):
 
 class MissingEmbeddingError(DomainError):
     """얼굴 임베딩 없이 다음 단계로 진행."""
+
+
+class ActiveIssueConflictError(DomainError):
+    """반납되지 않은 active 발급 기록과 새 발급이 충돌."""

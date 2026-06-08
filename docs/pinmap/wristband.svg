@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="640" viewBox="0 0 1000 640" font-family="Segoe UI, Arial, sans-serif">
+  <style>
+    .bg{fill:#fbfaf7}
+    .title{font-size:22px;font-weight:700;fill:#1a1a1a}
+    .sub{font-size:12px;fill:#777}
+    .mcu{fill:#eef3ff;stroke:#2a4d9b;stroke-width:2;rx:10}
+    .periph{fill:#ffffff;stroke:#444;stroke-width:1.5;rx:8}
+    .pwr{fill:#fff5e6;stroke:#c98a00;stroke-width:1.5;rx:8}
+    .lbl{font-size:13px;fill:#1a1a1a}
+    .lblb{font-size:13px;font-weight:700;fill:#1a1a1a}
+    .pin{font-size:12px;font-family:Consolas,monospace;fill:#1a3a8a;font-weight:700}
+    .note{font-size:11px;fill:#666}
+    .wire{stroke:#2a4d9b;stroke-width:2;fill:none}
+    .wirei2c{stroke:#1a7a3a;stroke-width:2.5;fill:none}
+    .wireint{stroke:#999;stroke-width:1.5;fill:none;stroke-dasharray:4 3}
+    .dot{fill:#2a4d9b}
+    .doti{fill:#1a7a3a}
+    .rf{stroke:#b03a8a;stroke-width:2;fill:none}
+  </style>
+  <rect class="bg" x="0" y="0" width="1000" height="640"/>
+  <text class="title" x="30" y="40">팔찌 (Wristband) — ESP32-C3</text>
+  <text class="sub" x="30" y="60">firmware/wristband · BLE 주변장치 ↔ ESP-NOW 수신 · 내장 0.42" OLED</text>
+
+  <!-- MCU -->
+  <rect class="mcu" x="60" y="100" width="300" height="480" rx="10"/>
+  <text class="lblb" x="210" y="128" text-anchor="middle">ESP32-C3</text>
+  <text class="note" x="210" y="146" text-anchor="middle">(0.42" OLED 보드)</text>
+
+  <!-- MCU right-edge pin ports -->
+  <g text-anchor="end">
+    <text class="pin" x="350" y="184">GPIO5 · SDA</text>
+    <text class="pin" x="350" y="214">GPIO6 · SCL</text>
+    <text class="pin" x="350" y="262">GPIO7 · GPO-INT</text>
+    <text class="pin" x="350" y="324">GPIO2 · RGB R</text>
+    <text class="pin" x="350" y="354">GPIO1 · RGB G</text>
+    <text class="pin" x="350" y="384">GPIO0 · RGB B</text>
+    <text class="pin" x="350" y="446">GPIO8 · LED(내장)</text>
+    <text class="pin" x="350" y="486">GPIO9 · BOOT(내장)</text>
+    <text class="pin" x="350" y="548">3V3 / GND</text>
+  </g>
+
+  <!-- ports dots -->
+  <circle class="doti" cx="360" cy="180" r="4"/>
+  <circle class="doti" cx="360" cy="210" r="4"/>
+  <circle class="dot"  cx="360" cy="258" r="4"/>
+  <circle class="dot"  cx="360" cy="320" r="4"/>
+  <circle class="dot"  cx="360" cy="350" r="4"/>
+  <circle class="dot"  cx="360" cy="380" r="4"/>
+
+  <!-- ===== I2C bus to OLED + ST25DV ===== -->
+  <!-- SDA/SCL run right, join an I2C trunk at x=470 -->
+  <path class="wirei2c" d="M360,180 H470"/>
+  <path class="wirei2c" d="M360,210 H470"/>
+  <path class="wirei2c" d="M470,180 V250"/>
+  <path class="wirei2c" d="M470,210 V250"/>
+  <text class="note" x="476" y="176">I2C 공유버스</text>
+
+  <!-- OLED -->
+  <rect class="periph" x="660" y="120" width="300" height="64" rx="8"/>
+  <text class="lblb" x="676" y="146">OLED 0.42" 72x40</text>
+  <text class="note" x="676" y="166">SSD1306 · I2C 0x3C · 보드 내장</text>
+  <path class="wirei2c" d="M470,150 H560 V152 H660"/>
+  <circle class="doti" cx="660" cy="152" r="4"/>
+  <text class="note" x="500" y="142">SDA/SCL</text>
+
+  <!-- ST25DV -->
+  <rect class="periph" x="660" y="206" width="300" height="96" rx="8"/>
+  <text class="lblb" x="676" y="232">ST25DV (NFC 태그)</text>
+  <text class="note" x="676" y="252">I2C 0x53/0x57/0x2D · GPO 인터럽트</text>
+  <text class="note" x="676" y="270">부팅 시 BLE 주소를 user 블록4-5 기록</text>
+  <path class="wirei2c" d="M470,250 H600 V240 H660"/>
+  <circle class="doti" cx="660" cy="240" r="4"/>
+  <!-- GPO -->
+  <path class="wire" d="M360,258 H520 V280 H660"/>
+  <circle class="dot" cx="660" cy="280" r="4"/>
+  <text class="note" x="528" y="274">GPO → GPIO7 (FALLING)</text>
+  <!-- RF antenna -->
+  <path class="rf" d="M960,254 q30,-14 30,0 q0,14 -30,0"/>
+  <path class="rf" d="M960,254 q44,-22 44,0"/>
+  <text class="note" x="950" y="296" fill="#b03a8a">RF ~13.56MHz )))</text>
+
+  <!-- ===== RGB LED ===== -->
+  <rect class="periph" x="660" y="324" width="300" height="96" rx="8"/>
+  <text class="lblb" x="676" y="350">RGB LED (공통 캐소드)</text>
+  <text class="note" x="676" y="370">각 핀 직렬 저항 ~330Ω · active-high</text>
+  <text class="note" x="676" y="388">캐소드 → GND</text>
+  <path class="wire" d="M360,320 H560 V348 H660"/>
+  <path class="wire" d="M360,350 H540 V366 H660"/>
+  <path class="wire" d="M360,380 H520 V384 H660"/>
+  <circle class="dot" cx="660" cy="348" r="4"/>
+  <circle class="dot" cx="660" cy="366" r="4"/>
+  <circle class="dot" cx="660" cy="384" r="4"/>
+  <text class="note" x="566" y="342">R/G/B = GPIO 2/1/0</text>
+
+  <!-- internal: onboard LED + BOOT -->
+  <path class="wireint" d="M360,440 H520"/>
+  <path class="wireint" d="M360,480 H520"/>
+  <text class="note" x="526" y="444">내장 LED (active-low)</text>
+  <text class="note" x="526" y="484">BOOT 버튼 (PULLUP) → 체결 플래그</text>
+
+  <!-- power -->
+  <rect class="pwr" x="660" y="442" width="300" height="56" rx="8"/>
+  <text class="lblb" x="676" y="466">전원 3V3 / GND</text>
+  <text class="note" x="676" y="486">외부전원 운용 시 배터리 → 3V3 · 무선 온칩</text>
+  <path class="wire" d="M360,548 H600 V470 H660" stroke="#c98a00"/>
+
+  <!-- legend -->
+  <g transform="translate(30,598)">
+    <line x1="0" y1="0" x2="28" y2="0" class="wirei2c"/><text class="note" x="34" y="4">I2C</text>
+    <line x1="120" y1="0" x2="148" y2="0" class="wire"/><text class="note" x="154" y="4">GPIO</text>
+    <line x1="240" y1="0" x2="268" y2="0" class="wireint"/><text class="note" x="274" y="4">내장(외부배선 없음)</text>
+    <line x1="450" y1="0" x2="478" y2="0" class="rf"/><text class="note" x="484" y="4">RF 근접통신</text>
+  </g>
+</svg>

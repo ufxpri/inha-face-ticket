@@ -38,8 +38,8 @@ class FlowBase:
 
     # ── BLE 컨텍스트 ──────────────────────────────────────────
     @asynccontextmanager
-    async def ble_session(self, timeout: float = 15.0):
-        ok = await self.ble.connect_wristband(timeout=timeout)
+    async def ble_session(self, timeout: float = 15.0, address: "str | None" = None):
+        ok = await self.ble.connect_wristband(timeout=timeout, address=address)
         try:
             yield ok
         finally:

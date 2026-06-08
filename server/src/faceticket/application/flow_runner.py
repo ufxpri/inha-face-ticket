@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Optional
 
 from faceticket.application.flows import EntryFlow, IssueFlow, ReturnFlow
 from faceticket.application.flows.entry import EntryFaceResult, EntryTagResult
@@ -68,6 +67,9 @@ class FlowRunner:
         if not await self._guard_idle("입장 시작"):
             return
         await self._safe(self.entry.start())
+        # START 직후 곧바로 팔찌 대기(wake)로 자동 진입 — 별도 TAGGED 클릭 제거.
+        # entry_tag 는 flow==ENTRY 가드가 있어, start 가 실패/abort 했으면 자동 no-op.
+        await self.entry_tag()
 
     async def entry_tag(self) -> None:
         if self.session.flow != Flow.ENTRY:
@@ -82,6 +84,8 @@ class FlowRunner:
         if not await self._guard_idle("반납 시작"):
             return
         await self._safe(self.return_.start())
+        # START 직후 곧바로 팔찌 대기(wake)로 자동 진입 — 별도 TAGGED 클릭 제거.
+        await self.return_tag()
 
     async def return_tag(self) -> None:
         if self.session.flow != Flow.RETURN:
@@ -100,6 +104,9 @@ class FlowRunner:
         """태블릿이 임베딩을 보냈을 때 — 현재 플로우에 따라 dispatch."""
         if self.session.flow == Flow.ISSUE:
             await self._safe(self.issue.on_face_captured(embedding))
+            # 얼굴 임베딩 확보 직후 곧바로 팔찌 대기(wake)로 자동 진입 — 별도 TAGGED 클릭 제거.
+            # issue_tag 는 flow==ISSUE 가드가 있어, 캡처 처리가 실패/abort 했으면 자동 no-op.
+            await self.issue_tag()
         elif self.session.flow == Flow.ENTRY:
             result = await self._safe_outcome(
                 self.entry.on_face_captured(embedding),
@@ -131,11 +138,7 @@ class FlowRunner:
         await self._abort_no_log()
 
     async def _abort_no_log(self) -> None:
-        # BLE 안전 해제
-        try:
-            await self.issue.ble.disconnect()
-        except Exception:
-            pass
+        await self.issue._safe_ble_disconnect()   # BLE 안전 해제 (FlowBase 공용 헬퍼)
         self.session.reset()
         await self.presenter.emit_state(FlowState.IDLE)
 

@@ -8,9 +8,9 @@ import datetime
 import sqlite3
 import threading
 from pathlib import Path
-from typing import Optional
 
 from faceticket.application.ports import IIssueRepository, IssueRecord
+from faceticket.domain.errors import ActiveIssueConflictError
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS issues (
@@ -39,6 +39,18 @@ class SqliteIssueRepository(IIssueRepository):
 
     def record_issue(self, wristband_id: str, seat: str, name: str = "") -> int:
         with self.lock:
+            active_wristband = self._find_active_by_wristband(wristband_id)
+            if active_wristband is not None:
+                raise ActiveIssueConflictError(
+                    f"이미 발급 중인 팔찌입니다: {wristband_id} → 좌석 {active_wristband.seat}"
+                )
+
+            active_seat = self._find_active_by_seat(seat)
+            if active_seat is not None:
+                raise ActiveIssueConflictError(
+                    f"이미 발급 중인 좌석입니다: {seat} → 팔찌 {active_seat.wristband_id}"
+                )
+
             cur = self.conn.execute(
                 "INSERT INTO issues (wristband_id, seat, name, issued_at) VALUES (?, ?, ?, ?)",
                 (wristband_id, seat, name, _now()),
@@ -63,21 +75,44 @@ class SqliteIssueRepository(IIssueRepository):
                 "FROM issues WHERE returned_at IS NULL ORDER BY id DESC"
             )
             cols = ["id", "wristband_id", "seat", "name", "issued_at"]
-            return [dict(zip(cols, r)) for r in cur.fetchall()]
+            return [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]
 
-    def find_active_by_wristband(self, wristband_id: str) -> Optional[IssueRecord]:
+    def find_active_by_wristband(self, wristband_id: str) -> IssueRecord | None:
         with self.lock:
-            cur = self.conn.execute(
-                "SELECT id, wristband_id, seat, name, issued_at "
-                "FROM issues WHERE wristband_id = ? AND returned_at IS NULL",
-                (wristband_id,),
-            )
-            row = cur.fetchone()
-            if not row:
-                return None
-            return IssueRecord(id=row[0], wristband_id=row[1], seat=row[2],
-                               name=row[3], issued_at=row[4])
+            return self._find_active_by_wristband(wristband_id)
+
+    def find_active_by_seat(self, seat: str) -> IssueRecord | None:
+        with self.lock:
+            return self._find_active_by_seat(seat)
+
+    def _find_active_by_wristband(self, wristband_id: str) -> IssueRecord | None:
+        cur = self.conn.execute(
+            "SELECT id, wristband_id, seat, name, issued_at "
+            "FROM issues WHERE wristband_id = ? AND returned_at IS NULL",
+            (wristband_id,),
+        )
+        return _row_to_issue_record(cur.fetchone())
+
+    def _find_active_by_seat(self, seat: str) -> IssueRecord | None:
+        cur = self.conn.execute(
+            "SELECT id, wristband_id, seat, name, issued_at "
+            "FROM issues WHERE seat = ? AND returned_at IS NULL",
+            (seat,),
+        )
+        return _row_to_issue_record(cur.fetchone())
 
     def close(self) -> None:
         with self.lock:
             self.conn.close()
+
+
+def _row_to_issue_record(row) -> IssueRecord | None:
+    if not row:
+        return None
+    return IssueRecord(
+        id=row[0],
+        wristband_id=row[1],
+        seat=row[2],
+        name=row[3],
+        issued_at=row[4],
+    )

@@ -3,13 +3,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 from faceticket.application.flows._base import FlowBase
 from faceticket.application.ports import IIssueRepository
 from faceticket.config import LED_ISSUED
 from faceticket.domain.embedding import Embedding
-from faceticket.domain.errors import MissingEmbeddingError
+from faceticket.domain.errors import ActiveIssueConflictError, MissingEmbeddingError
 from faceticket.domain.states import Flow, FlowState
 
 log = logging.getLogger(__name__)
@@ -21,7 +20,7 @@ class IssueOutcome:
     wristband_id: str = ""
     seat: str = ""
     issue_id: int = 0
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class IssueFlow(FlowBase):
@@ -46,32 +45,56 @@ class IssueFlow(FlowBase):
     async def on_face_captured(self, embedding: Embedding) -> None:
         self.session.embedding = embedding
         await self.presenter.emit_log(
-            "③ 얼굴 임베딩 추출 완료. 팔찌를 NFC 리더에 태그하세요."
+            "③ 얼굴 임베딩 추출 완료 — 팔찌 인식으로 자동 진입합니다."
         )
         await self.presenter.emit_state(FlowState.AWAIT_TAG)
 
-    # ── 팔찌 태그 (운영자 클릭) ───────────────────────────────
+    # ── 팔찌 태그 (얼굴 캡처 후 자동 진입) ────────────────────
     async def on_tag(self) -> IssueOutcome:
         if self.session.embedding is None:
             raise MissingEmbeddingError("얼굴 임베딩이 없습니다.")
 
         dev = self.require_device()
-        await self.presenter.emit_log("④ 운영자 장치에 wake 명령 전송 (Serial)")
-        if not await dev.wake_wristband():
+        await self.presenter.emit_log("④ 팔찌를 NFC 리더에 대주세요 — wake 대기 중 (최대 15초)")
+        if not await dev.wake_wristband_wait():
             return IssueOutcome(False, reason="wake 실패 — 장치 상태를 확인하세요.")
+        await self.presenter.emit_sound("tag")   # NFC 태그 인식 — 태블릿 '삑'
 
         await self.presenter.emit_log("⑤ 팔찌 BLE 광고 대기 후 Central 연결 시도")
-        async with self.ble_session() as connected:
+        async with self.ble_session(address=dev.last_wristband_addr) as connected:
             if not connected:
                 return IssueOutcome(False, reason="BLE 연결 실패")
+
+            wid = await self.ble.read_wristband_id()
+            if not wid:
+                return IssueOutcome(False, reason="팔찌 ID read 실패")
+
+            active_wristband = self.repo.find_active_by_wristband(wid)
+            if active_wristband is not None:
+                return IssueOutcome(
+                    False,
+                    reason=f"이미 발급 중인 팔찌입니다: {wid} → 좌석 {active_wristband.seat}",
+                )
+
+            active_seat = self.repo.find_active_by_seat(self.session.seat)
+            if active_seat is not None:
+                return IssueOutcome(
+                    False,
+                    reason=(
+                        f"이미 발급 중인 좌석입니다: "
+                        f"{self.session.seat} → 팔찌 {active_seat.wristband_id}"
+                    ),
+                )
 
             await self.presenter.emit_log("⑥ 임베딩 / 좌석 정보 write (BLE GATT)")
             if not await self.ble.write_embedding(self.session.embedding):
                 return IssueOutcome(False, reason="임베딩 write 실패")
             await self.ble.write_seat(self.session.seat)
 
-            wid = await self.ble.read_wristband_id()
-            issue_id = self.repo.record_issue(wid, self.session.seat, self.session.name)
+            try:
+                issue_id = self.repo.record_issue(wid, self.session.seat, self.session.name)
+            except ActiveIssueConflictError as e:
+                return IssueOutcome(False, reason=str(e))
             await self.presenter.emit_log(
                 f"⑦ SQLite 기록 — issue#{issue_id} 팔찌 {wid} → 좌석 {self.session.seat}"
             )

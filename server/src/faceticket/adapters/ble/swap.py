@@ -78,8 +78,8 @@ class BleSwap(IBleCentral):
             return self._mock_backend
         return self._real_backend
 
-    async def connect_wristband(self, timeout: float = 15.0) -> bool:
-        return await self._current.connect_wristband(timeout=timeout)
+    async def connect_wristband(self, timeout: float = 15.0, address: Optional[str] = None) -> bool:
+        return await self._current.connect_wristband(timeout=timeout, address=address)
 
     async def disconnect(self) -> None:
         await self._current.disconnect()

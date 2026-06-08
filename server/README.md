@@ -74,8 +74,10 @@ python run.py
 | `FT_SSL` | `1` | `0`/`false` 로 두면 평문 HTTP |
 | `FT_SSL_CERT` | (자동) | PEM 인증서 경로 — 미지정 시 `server/certs/server.crt` 사용/생성 |
 | `FT_SSL_KEY` | (자동) | PEM 비밀키 경로 — 미지정 시 `server/certs/server.key` 사용/생성 |
-| `FT_OPERATOR_PORT` | (없음) | 운영자 장치 시리얼 포트 (예: `COM5` / `/dev/ttyACM0` / `SIM`). 미지정 시 부팅 직후 자동연결 생략 — 운영자 UI 에서 수동 선택 |
-| `FT_SERIAL_BAUD` | `115200` | 운영자 장치 시리얼 보드레이트 |
+| `FT_OPERATOR_PORT` | (없음) | **통합/SIM 폴백** — NFC·게이트 두 역할을 같은 포트로 자동연결 (예: `SIM`). 실제 COM 은 같은 포트를 두 번 못 여니 SIM 데모용에 가깝다. `FT_NFC_PORT`/`FT_GATE_PORT` 가 하나라도 지정되면 무시됨 |
+| `FT_NFC_PORT` | (없음) | **NFC 리더(ESP32+PN5180)** 시리얼 포트 — `WAKE`/`CLEAR` 라우팅 대상 (예: `COM5` / `/dev/ttyACM0` / `SIM`) |
+| `FT_GATE_PORT` | (없음) | **입장 게이트(Arduino UNO)** 시리얼 포트 — `PASS`/`DENY` 라우팅 대상 (예: `COM6` / `SIM`) |
+| `FT_SERIAL_BAUD` | `115200` | 운영자 장치 시리얼 보드레이트 (두 역할 공통) |
 | `FT_BLE_MOCK` | `1` | `0` 으로 두면 실제 bleak BLE central 사용. 기본은 mock 팔찌 (BLE 동글 없이도 동작) |
 | `FT_FACE_STUB` | `0` | `1` 이면 `facenet-pytorch` 가 설치돼 있어도 stub 임베딩 강제 — 모델 로딩 시간 회피 / 결정적 테스트용 |
 
@@ -87,13 +89,50 @@ python run.py
 # 평문 HTTP, 운영자 장치 SIM 모드, BLE 도 mock
 FT_SSL=0 FT_OPERATOR_PORT=SIM FT_BLE_MOCK=1 python run.py
 
-# 4443 포트, 실제 bleak BLE, 실제 시리얼 (COM5)
-FT_PORT=4443 FT_BLE_MOCK=0 FT_OPERATOR_PORT=COM5 python run.py
+# 하드웨어 없이 발급 데모: SIM serial + mock BLE + face stub
+FT_SSL=0 FT_OPERATOR_PORT=SIM FT_BLE_MOCK=1 FT_FACE_STUB=1 python run.py
+
+# NFC 리더(ESP32)와 입장 게이트(UNO)를 서로 다른 COM 포트로 분리 운용
+FT_BLE_MOCK=0 FT_NFC_PORT=COM5 FT_GATE_PORT=COM6 python run.py
+
+# 게이트는 아직 없고 NFC 리더만 붙인 상태 (PASS/DENY 는 자동으로 graceful 실패)
+FT_NFC_PORT=COM5 python run.py
 ```
+
+> **운영자 장치 = NFC 리더 + 입장 게이트 2-포트.** 서버는 명령을 역할별로 라우팅한다:
+> `WAKE`/`CLEAR` → NFC(ESP32+PN5180), `PASS`/`DENY` → 게이트(UNO 서보/초음파). NFC 리더는
+> 모든 플로우의 진입(wake) 조건이라 미연결 시 절차 시작이 막히고, 게이트는 입장 전용이라
+> 미연결이어도 PASS/DENY 만 graceful 실패한다. 운영자 UI 에 두 역할 연결 카드가 따로 있다.
 
 PowerShell 에서는 `$env:FT_PORT=4443; python run.py`.
 
-### 6. 동작 확인
+### 6. 하드웨어 없이 발급/입장 확인
+
+로컬 브라우저에서만 확인할 때는 HTTP 로 충분하다. 태블릿을 LAN 의 다른 기기에서 열어 카메라를
+사용하려면 `FT_SSL=0` 을 빼고 HTTPS 로 실행한다.
+
+1. 서버를 데모 모드로 실행한다.
+
+   ```bash
+   FT_SSL=0 FT_OPERATOR_PORT=SIM FT_BLE_MOCK=1 FT_FACE_STUB=1 python run.py
+   ```
+
+2. 같은 브라우저에서 `http://localhost:8000/admin` 과 `http://localhost:8000/tablet` 을 연다.
+3. 운영자 화면에서 `ISSUE` 모드, 운영자 장치가 `CONNECTED@SIM` 인지 확인한다.
+4. `START` 를 누르면 태블릿 화면이 얼굴 캡처를 수행한다.
+5. 운영자 화면 상태가 `await_tag` 로 바뀌면 `WRISTBAND TAGGED` 를 누른다.
+6. 성공하면 태블릿에 발급 완료가 표시되고, `server/issue.db` 의 `issues` 테이블에 active 발급 row 가 남는다.
+
+이 모드는 실제 Arduino/ESP32/FaceNet 모델 없이 WebSocket, 발급 유스케이스, mock BLE 저장, SQLite
+기록까지 이어지는 최소 데모 경로를 확인하는 용도다.
+
+입장까지 확인하려면 운영자 화면에서 `ENTRY` 모드로 전환한 뒤 `START` → `WRISTBAND TAGGED` 순서로
+진행한다. 단, `FT_FACE_STUB=1` 은 이미지 bytes 해시로 임베딩을 만들기 때문에 실제 카메라로 두 번
+촬영하면 같은 사람이어도 이미지 bytes 가 달라져 `DENY` 가 날 수 있다. 입장 PASS 판정까지
+결정적으로 확인하려면 같은 이미지 payload 를 재사용하는 WebSocket smoke test 를 쓰거나,
+실제 얼굴 모델 모드에서 같은 사람을 촬영해야 한다.
+
+### 7. 동작 확인
 
 부팅 로그가 다음 비슷하면 정상:
 
@@ -107,7 +146,7 @@ INFO:     Uvicorn running on https://0.0.0.0:8000 (Press CTRL+C to quit)
 
 각 어댑터의 현재 모드(`stub`/`facenet`, `mock`/`bleak`, `SIM`/실포트)는 운영자 페이지 상단 배지에서도 확인 가능.
 
-### 7. 자주 마주치는 문제
+### 8. 자주 마주치는 문제
 
 - **태블릿에서 카메라가 안 켜진다** → URL 이 `http://` 인지 확인. `https://` + 자체서명 경고 수락이 필수.
 - **`ModuleNotFoundError: No module named 'uvicorn'`** → venv 활성화 안 됨. `which python` / `where python` 으로 `.venv` 경로 확인.

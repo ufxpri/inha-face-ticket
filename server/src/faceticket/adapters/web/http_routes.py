@@ -19,7 +19,7 @@ def create_router() -> APIRouter:
         return HTMLResponse(
             "<h2>오프라인 얼굴인증 전자 티켓 시스템</h2>"
             "<ul>"
-            "<li><a href='/admin'>운영자 — 발급/입장/반납 페이지</a></li>"
+            "<li><a href='/admin'>운영자 — 발급/입장/반납 페이지 (팔찌 LED 제어 포함)</a></li>"
             "<li><a href='/tablet'>관객 — 태블릿 얼굴 캡처 페이지</a></li>"
             "</ul>"
         )

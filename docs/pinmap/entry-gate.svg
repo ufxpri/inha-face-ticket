@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600" viewBox="0 0 1000 600" font-family="Segoe UI, Arial, sans-serif">
+  <style>
+    .bg{fill:#fbfaf7}
+    .title{font-size:22px;font-weight:700;fill:#1a1a1a}
+    .sub{font-size:12px;fill:#777}
+    .mcu{fill:#eafaef;stroke:#1a7a3a;stroke-width:2}
+    .periph{fill:#ffffff;stroke:#444;stroke-width:1.5}
+    .pwr{fill:#fff5e6;stroke:#c98a00;stroke-width:1.5}
+    .lblb{font-size:13px;font-weight:700;fill:#1a1a1a}
+    .pin{font-size:12px;font-family:Consolas,monospace;fill:#15692f;font-weight:700}
+    .note{font-size:11px;fill:#666}
+    .wire{stroke:#1a7a3a;stroke-width:2;fill:none}
+    .wirepwm{stroke:#2a4d9b;stroke-width:2.5;fill:none}
+    .dot{fill:#1a7a3a}
+  </style>
+  <rect class="bg" x="0" y="0" width="1000" height="600"/>
+  <text class="title" x="30" y="40">입장 게이트 (Entry Gate) — Arduino UNO</text>
+  <text class="sub" x="30" y="60">firmware/arduino-gate · 서버 PASS/DENY 명령 · 5V 로직</text>
+
+  <!-- MCU -->
+  <rect class="mcu" x="60" y="100" width="280" height="400" rx="10"/>
+  <text class="lblb" x="200" y="128" text-anchor="middle">Arduino UNO</text>
+  <g text-anchor="end">
+    <text class="pin" x="330" y="184">D9 · 서보 신호 (PWM)</text>
+    <text class="pin" x="330" y="244">D5 · 초록 LED</text>
+    <text class="pin" x="330" y="284">D6 · 빨강 LED</text>
+    <text class="pin" x="330" y="344">D7 · Trig</text>
+    <text class="pin" x="330" y="384">D8 · Echo</text>
+    <text class="pin" x="330" y="448">5V / GND</text>
+  </g>
+
+  <!-- Servo -->
+  <rect class="periph" x="640" y="150" width="280" height="64" rx="8"/>
+  <text class="lblb" x="660" y="176">서보 (차단바)</text>
+  <text class="note" x="660" y="196">닫힘 0° · 열림 90°</text>
+  <path class="wirepwm" d="M340,180 H640"/>
+  <circle class="dot" cx="640" cy="180" r="4"/>
+  <text class="note" x="430" y="172">PWM 신호</text>
+
+  <!-- Green LED -->
+  <rect class="periph" x="640" y="226" width="280" height="46" rx="8"/>
+  <text class="lblb" x="660" y="254">초록 LED (PASS / 통과)</text>
+  <path class="wire" d="M340,240 H640"/>
+  <circle class="dot" cx="640" cy="240" r="4"/>
+  <text class="note" x="430" y="234">[220Ω] → GND</text>
+
+  <!-- Red LED -->
+  <rect class="periph" x="640" y="282" width="280" height="46" rx="8"/>
+  <text class="lblb" x="660" y="310">빨강 LED (DENY / 거부)</text>
+  <path class="wire" d="M340,280 H640"/>
+  <circle class="dot" cx="640" cy="280" r="4"/>
+  <text class="note" x="430" y="274">[220Ω] → GND</text>
+
+  <!-- HC-SR04 -->
+  <rect class="periph" x="640" y="338" width="280" height="74" rx="8"/>
+  <text class="lblb" x="660" y="364">초음파 HC-SR04 (통과 감지)</text>
+  <text class="note" x="660" y="384">Trig 출력 · Echo 입력 · VCC 5V</text>
+  <text class="note" x="660" y="402">통과 감지로 PASS 확인</text>
+  <path class="wire" d="M340,340 H520 V356 H640"/>
+  <path class="wire" d="M340,380 H500 V388 H640"/>
+  <circle class="dot" cx="640" cy="356" r="4"/>
+  <circle class="dot" cx="640" cy="388" r="4"/>
+  <text class="note" x="430" y="334">Trig</text>
+  <text class="note" x="430" y="398">Echo</text>
+
+  <!-- power -->
+  <rect class="pwr" x="640" y="424" width="280" height="60" rx="8"/>
+  <text class="lblb" x="660" y="448">전원 5V / GND</text>
+  <text class="note" x="660" y="466">서보 전류 크면 외부 5V 권장</text>
+  <text class="note" x="660" y="480">(공통 GND 필수)</text>
+  <path class="wire" d="M340,448 H520 V454 H640" stroke="#c98a00"/>
+
+  <!-- legend -->
+  <g transform="translate(30,540)">
+    <line x1="0" y1="0" x2="28" y2="0" class="wirepwm"/><text class="note" x="34" y="4">PWM(서보)</text>
+    <line x1="140" y1="0" x2="168" y2="0" class="wire"/><text class="note" x="174" y="4">디지털 I/O</text>
+  </g>
+</svg>

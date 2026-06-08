@@ -58,6 +58,11 @@ def msg_flags(snapshot: dict) -> dict:
     return {"type": "flags", **snapshot}
 
 
+def msg_sound(kind: str) -> dict:
+    """태블릿에서 효과음 재생 트리거 (예: NFC 태그 인식 'tag')."""
+    return {"type": "sound", "kind": kind}
+
+
 # ── inbound 정규화 ───────────────────────────────────────────
 
 
@@ -70,6 +75,13 @@ class AdminCommand:
     layer: str = ""               # toggle 용 ("face" | "ble")
     mock: bool = False            # toggle 용
     port: str = ""                # io_connect 용
+    role: str = ""                # io_connect/io_disconnect 용 ("nfc" | "gate")
+    command: str = ""             # led 용 — 단색("RGB R/G/B/OFF") 또는 패턴("PATTERN RAINBOW" 등, LED_PATTERNS 키)
+
+
+def is_disconnect_runtime_error(exc: RuntimeError) -> bool:
+    """WS 종료 후 send 시 나는 'not connected' RuntimeError 인지 (admin/tablet 공용)."""
+    return "WebSocket is not connected" in str(exc)
 
 
 def parse_admin_message(data: dict) -> AdminCommand:
@@ -81,4 +93,6 @@ def parse_admin_message(data: dict) -> AdminCommand:
         layer=str(data.get("layer", "")),
         mock=bool(data.get("mock", False)),
         port=str(data.get("port", "")),
+        role=str(data.get("role", "")).strip(),
+        command=str(data.get("command", "")).strip(),
     )

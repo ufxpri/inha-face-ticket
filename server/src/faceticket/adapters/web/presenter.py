@@ -49,6 +49,9 @@ class WebSocketPresenter(IPresenter):
         emb_list = _to_list(embedding) if embedding is not None else None
         await self.tablets.broadcast(wp.msg_capture_result(ok, msg, emb_list))
 
+    async def emit_sound(self, kind: str) -> None:
+        await self.tablets.broadcast(wp.msg_sound(kind))
+
     # ── 양쪽 모두 ────────────────────────────────────────────
     async def emit_complete(self, ok: bool, msg: str, **extra: Any) -> None:
         # 태블릿이 결과를 띄우려면 받아야 한다.
