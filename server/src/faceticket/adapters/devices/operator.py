@@ -53,10 +53,16 @@ class OperatorDevice(IOperatorDevice):
             "OPERATOR", baud=baud,
             sim_response=_sim_response, sim_latency=0.15,
         )
+        self._last_addr: str | None = None   # 직전 WAKE 에서 받은 팔찌 BLE 주소
 
     @property
     def is_connected(self) -> bool:
         return self._t.is_connected
+
+    @property
+    def last_wristband_addr(self) -> str | None:
+        """직전 wake 에서 NFC 핸드오프로 받은 팔찌 BLE 주소(없으면 None → 이름 스캔)."""
+        return self._last_addr
 
     @property
     def port(self) -> str | None:
@@ -104,6 +110,7 @@ class OperatorDevice(IOperatorDevice):
         """
         deadline = time.monotonic() + timeout_s
         attempt = 0
+        self._last_addr = None
         while True:
             attempt += 1
             try:
@@ -116,6 +123,12 @@ class OperatorDevice(IOperatorDevice):
                 len(parts) > 1 and parts[1].lower() in FAILURE_DETAILS
             )
             if ok:
+                # "OK ADDR=AABBCCDDEEFF" → 팔찌 BLE 주소 핸드오프 (없으면 이름 스캔 폴백)
+                if len(parts) > 1 and parts[1].upper().startswith("ADDR="):
+                    hx = parts[1].split("=", 1)[1].strip()
+                    if len(hx) == 12 and all(c in "0123456789abcdefABCDEF" for c in hx):
+                        self._last_addr = ":".join(hx[i:i + 2] for i in range(0, 12, 2)).upper()
+                        log.info("[OPERATOR] 팔찌 BLE 주소 수신: %s", self._last_addr)
                 if attempt > 1:
                     log.info("[OPERATOR] wake OK (시도 %d)", attempt)
                 return True

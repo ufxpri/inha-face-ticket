@@ -1,3 +1,5 @@
+import asyncio
+
 import numpy as np
 import pytest
 
@@ -52,6 +54,9 @@ class RecordingPresenter:
     async def emit_flags(self, snapshot: dict) -> None:
         self.flags.append(snapshot)
 
+    async def emit_sound(self, kind: str) -> None:
+        pass
+
 
 class FakeOperatorDevice:
     def __init__(
@@ -75,6 +80,10 @@ class FakeOperatorDevice:
     @property
     def port(self) -> str | None:
         return "FAKE" if self.connected else None
+
+    @property
+    def last_wristband_addr(self) -> str | None:
+        return None
 
     async def connect(self, port: str) -> bool:
         self.connected = True
@@ -123,7 +132,7 @@ class ControlledBleCentral:
         self.read_flag_calls = 0
         self.led_codes: list[int] = []
 
-    async def connect_wristband(self, timeout: float = 15.0) -> bool:
+    async def connect_wristband(self, timeout: float = 15.0, address: str | None = None) -> bool:
         self.connect_calls += 1
         return self.connect_ok
 
@@ -301,9 +310,10 @@ async def test_matching_face_signals_pass_and_success_led() -> None:
     session.embedding = stored
 
     result = await flow.on_face_captured(stored)
+    await asyncio.sleep(0.05)   # 백그라운드 게이트 개방 태스크 실행 대기
 
     assert result.passed is True
-    assert result.message == "통과"
+    assert result.message == "인증 통과"
     assert result.similarity == pytest.approx(1.0)
     assert device.pass_calls == 1
     assert device.deny_calls == 0
@@ -311,7 +321,9 @@ async def test_matching_face_signals_pass_and_success_led() -> None:
     assert ble.disconnect_calls == 1
 
 
-async def test_failed_gate_pass_marks_failure_led() -> None:
+async def test_gate_pass_failure_does_not_fail_entry() -> None:
+    # 얼굴이 맞으면 게이트 통과 감지 실패(또는 게이트 미연결)와 무관하게 인증은 '통과'.
+    # 게이트 개방/통과 확인은 결과를 막지 않는 백그라운드 작업이다.
     stored = embedding()
     flow, device, ble, _, session = make_flow(
         device=FakeOperatorDevice(pass_ok=False),
@@ -320,11 +332,12 @@ async def test_failed_gate_pass_marks_failure_led() -> None:
     session.embedding = stored
 
     result = await flow.on_face_captured(stored)
+    await asyncio.sleep(0.05)   # 백그라운드 게이트 태스크 실행 대기
 
-    assert result.passed is False
-    assert result.message == "게이트 통과 미감지"
-    assert device.pass_calls == 1
-    assert ble.led_codes == [LED_FAILURE]
+    assert result.passed is True
+    assert result.message == "인증 통과"
+    assert device.pass_calls == 1            # 게이트 개방은 시도됨
+    assert ble.led_codes == [LED_SUCCESS]    # 얼굴 통과 → 성공 LED
     assert ble.disconnect_calls == 1
 
 

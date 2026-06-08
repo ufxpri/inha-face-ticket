@@ -40,19 +40,33 @@ class BleakBleCentral(IBleCentral):
         self._BleakScanner = _S
         self.client = None
 
-    async def connect_wristband(self, timeout: float = 15.0) -> bool:
-        device = await self._BleakScanner.find_device_by_name(WRISTBAND_NAME, timeout=timeout)
-        if device is None:
-            log.warning("'%s' 광고를 찾지 못함", WRISTBAND_NAME)
-            return False
-        self.client = self._BleakClient(device)
+    async def connect_wristband(self, timeout: float = 15.0, address: str | None = None) -> bool:
+        # NFC 핸드오프로 주소를 받았으면 스캔 없이 그 주소로 직접 연결 (다중 팔찌 모호성 제거).
+        target = None
+        if address:
+            try:
+                target = await self._BleakScanner.find_device_by_address(address, timeout=timeout)
+            except Exception as e:
+                log.warning("주소 검색 오류: %s", e)
+            if target is None:
+                log.info("주소 %s 스캔 미발견 → 주소 직접 연결 시도", address)
+                target = address   # 문자열 주소도 BleakClient 가 수용(WinRT FromBluetoothAddress)
+        if target is None:
+            target = await self._BleakScanner.find_device_by_name(WRISTBAND_NAME, timeout=timeout)
+            if target is None:
+                log.warning("'%s' 광고를 찾지 못함", WRISTBAND_NAME)
+                return False
+        self.client = self._BleakClient(target)
         try:
             await self.client.connect()
             ok = self.client.is_connected
-            log.info("연결 결과: %s", ok)
+            log.info("연결 결과: %s (%s)", ok, address or WRISTBAND_NAME)
             return ok
         except Exception as e:
             log.warning("연결 실패: %s", e)
+            if address:   # 주소 경로 실패 → 이름 스캔으로 한 번 폴백
+                log.info("주소 연결 실패 → 이름 스캔 폴백")
+                return await self.connect_wristband(timeout=timeout, address=None)
             return False
 
     async def disconnect(self) -> None:

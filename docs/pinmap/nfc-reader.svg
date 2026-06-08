@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="640" viewBox="0 0 1000 640" font-family="Segoe UI, Arial, sans-serif">
+  <style>
+    .bg{fill:#fbfaf7}
+    .title{font-size:22px;font-weight:700;fill:#1a1a1a}
+    .sub{font-size:12px;fill:#777}
+    .mcu{fill:#eef3ff;stroke:#2a4d9b;stroke-width:2}
+    .periph{fill:#ffffff;stroke:#444;stroke-width:1.5}
+    .pwr{fill:#fff5e6;stroke:#c98a00;stroke-width:1.5}
+    .lblb{font-size:13px;font-weight:700;fill:#1a1a1a}
+    .pin{font-size:12px;font-family:Consolas,monospace;fill:#1a3a8a;font-weight:700}
+    .pinr{font-size:12px;font-family:Consolas,monospace;fill:#1a3a8a;font-weight:700}
+    .note{font-size:11px;fill:#666}
+    .wire{stroke:#2a4d9b;stroke-width:2;fill:none}
+    .wirei2c{stroke:#1a7a3a;stroke-width:2.5;fill:none}
+    .dot{fill:#2a4d9b}
+    .doti{fill:#1a7a3a}
+    .rf{stroke:#b03a8a;stroke-width:2;fill:none}
+  </style>
+  <rect class="bg" x="0" y="0" width="1000" height="640"/>
+  <text class="title" x="30" y="40">NFC 리더 (NFC Reader) — ESP32-C3 + PN5180</text>
+  <text class="sub" x="30" y="60">firmware/tools/esp32-pn5180-smoke · wake(RF write/read) + ESP-NOW RGB 송신 · 내장 OLED</text>
+
+  <!-- MCU -->
+  <rect class="mcu" x="60" y="100" width="280" height="430" rx="10"/>
+  <text class="lblb" x="200" y="128" text-anchor="middle">ESP32-C3</text>
+  <text class="note" x="200" y="146" text-anchor="middle">(0.42" OLED 보드)</text>
+  <g text-anchor="end">
+    <text class="pin" x="330" y="184">GPIO10 · NSS</text>
+    <text class="pin" x="330" y="214">GPIO7 · MOSI</text>
+    <text class="pin" x="330" y="244">GPIO3 · MISO</text>
+    <text class="pin" x="330" y="274">GPIO4 · SCK</text>
+    <text class="pin" x="330" y="304">GPIO20 · BUSY</text>
+    <text class="pin" x="330" y="334">GPIO21 · RST</text>
+    <text class="pin" x="330" y="408">GPIO5 · SDA</text>
+    <text class="pin" x="330" y="438">GPIO6 · SCL</text>
+  </g>
+
+  <!-- PN5180 -->
+  <rect class="periph" x="620" y="140" width="280" height="250" rx="10"/>
+  <text class="lblb" x="640" y="166">PN5180 (ISO15693 RF)</text>
+  <text class="note" x="640" y="184">SPI · 125kHz · IRQ/AUX 미사용(폴링)</text>
+  <g text-anchor="start">
+    <text class="pin" x="636" y="214">NSS</text>
+    <text class="pin" x="636" y="240">MOSI</text>
+    <text class="pin" x="636" y="266">MISO</text>
+    <text class="pin" x="636" y="292">SCK</text>
+    <text class="pin" x="636" y="318">BUSY</text>
+    <text class="pin" x="636" y="344">RST</text>
+  </g>
+  <!-- SPI wires -->
+  <path class="wire" d="M340,180 H470 V210 H620"/>
+  <path class="wire" d="M340,210 H458 V236 H620"/>
+  <path class="wire" d="M340,240 H446 V262 H620"/>
+  <path class="wire" d="M340,270 H434 V288 H620"/>
+  <path class="wire" d="M340,300 H422 V314 H620"/>
+  <path class="wire" d="M340,330 H410 V340 H620"/>
+  <circle class="dot" cx="620" cy="210" r="3.5"/>
+  <circle class="dot" cx="620" cy="236" r="3.5"/>
+  <circle class="dot" cx="620" cy="262" r="3.5"/>
+  <circle class="dot" cx="620" cy="288" r="3.5"/>
+  <circle class="dot" cx="620" cy="314" r="3.5"/>
+  <circle class="dot" cx="620" cy="340" r="3.5"/>
+  <text class="note" x="478" y="176">6선 SPI</text>
+  <!-- RF antenna on PN5180 -->
+  <path class="rf" d="M900,250 q34,-16 34,0 q0,16 -34,0"/>
+  <path class="rf" d="M900,250 q50,-26 50,0"/>
+  <text class="note" x="888" y="300" fill="#b03a8a">RF 13.56MHz )))  → 팔찌 ST25DV</text>
+
+  <!-- OLED -->
+  <rect class="periph" x="620" y="392" width="280" height="58" rx="8"/>
+  <text class="lblb" x="640" y="416">OLED 0.42" 72x40 (내장)</text>
+  <text class="note" x="640" y="434">SSD1306 · I2C 0x3C · 디버그 화면</text>
+  <path class="wirei2c" d="M340,408 H520 V414 H620"/>
+  <path class="wirei2c" d="M340,438 H500 V428 H620"/>
+  <circle class="doti" cx="620" cy="414" r="3.5"/>
+  <circle class="doti" cx="620" cy="428" r="3.5"/>
+  <text class="note" x="526" y="404">I2C SDA/SCL</text>
+
+  <!-- power -->
+  <rect class="pwr" x="620" y="462" width="280" height="64" rx="8"/>
+  <text class="lblb" x="640" y="486">전원 → PN5180</text>
+  <text class="note" x="640" y="504">5V(RF) + 3V3(로직) + GND 모두 필요</text>
+  <text class="note" x="640" y="520">ESP-NOW(ch6) 송신은 온칩 무선</text>
+
+  <!-- ESP-NOW out -->
+  <text class="note" x="70" y="560" fill="#b03a8a">((( ESP-NOW ch6 브로드캐스트 → 팔찌 RGB LED</text>
+
+  <!-- legend -->
+  <g transform="translate(30,600)">
+    <line x1="0" y1="0" x2="28" y2="0" class="wire"/><text class="note" x="34" y="4">SPI/GPIO</text>
+    <line x1="150" y1="0" x2="178" y2="0" class="wirei2c"/><text class="note" x="184" y="4">I2C(OLED)</text>
+    <line x1="320" y1="0" x2="348" y2="0" class="rf"/><text class="note" x="354" y="4">RF 근접통신</text>
+  </g>
+</svg>

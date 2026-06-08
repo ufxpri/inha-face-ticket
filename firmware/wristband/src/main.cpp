@@ -27,6 +27,7 @@
 #include <esp_idf_version.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
+#include "esp_mac.h"
 #include <NimBLEDevice.h>
 #include <Wire.h>
 #include <U8g2lib.h>
@@ -88,6 +89,9 @@ static const uint8_t  NFC_BLOCK_BYTES   = 4;
 static const uint16_t NFC_TRIGGER_BYTE_ADDR = NFC_TRIGGER_BLOCK * NFC_BLOCK_BYTES;  // 32
 static const uint8_t  NFC_WAKE_PAYLOAD[NFC_BLOCK_BYTES]  = {'F', 'T', 'W', 'K'};
 static const uint8_t  NFC_CLEAR_PAYLOAD[NFC_BLOCK_BYTES] = {0x00, 0x00, 0x00, 0x00};
+// BLE 주소 핸드오프: block4-5(byte 16~) 에 [addr0..5][magic 'F','A'] 기록.
+// NFC 리더가 WAKE 시 이걸 read 해 노트북이 스캔 없이 그 주소로 바로 연결.
+static const uint16_t NFC_ADDR_BYTE_ADDR = 4 * NFC_BLOCK_BYTES;  // block4 = 16
 
 // SYSTEM 레지스터 주소
 static const uint16_t ST25_REG_GPO          = 0x0000;  // GPO 설정 레지스터
@@ -118,6 +122,11 @@ static uint8_t  g_last_rgb    = RGB_CMD_OFF;
 static bool     g_notifyLedActive = false;
 static uint32_t g_notifyLedAt     = 0;
 static const uint32_t NOTIFY_LED_HOLD_MS = 3000;
+
+// 디버그 표시용 상태
+RTC_DATA_ATTR static uint32_t g_bootCount = 0;   // 리셋/크래시 감지(소프트리셋엔 유지)
+static String   g_lastEvent = "boot";            // 마지막 이벤트(태그/BLE연결/GATT write/RGB)
+static bool     g_hasEmb    = false;             // 임베딩 수신 여부(이번 부팅 세션)
 
 static volatile bool    pendingRgbCommand = false;
 static volatile uint8_t pendingRgbValue   = RGB_CMD_OFF;
@@ -312,45 +321,56 @@ static void onEspNowReceive(const uint8_t* mac, const uint8_t* data, int len) {
 }
 
 static void espNowBegin() {
+  // BLE 사이클 직후엔 WiFi 상태가 어정쩡해 RX 가 안 살아난다. OFF→STA 로 깨끗이 다시 올린다.
+  WiFi.mode(WIFI_OFF);
+  delay(50);
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
+  delay(120);                                       // 라디오/드라이버 안정화
   esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
   if (esp_now_init() != ESP_OK) {
     Serial.println("[ESPNOW] init failed");
     return;
   }
   esp_now_register_recv_cb(onEspNowReceive);
+  esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);   // init 후 채널 재확정
   Serial.printf("[ESPNOW] ready channel=%u mac=%s\n", ESPNOW_CHANNEL, WiFi.macAddress().c_str());
 }
 
 static void espNowEnd() {
   esp_now_unregister_recv_cb();
   esp_now_deinit();
-  esp_wifi_stop();
-  esp_wifi_deinit();
+  // raw esp_wifi_stop/deinit 는 Arduino WiFi 상태머신과 desync 되어 복귀 시 RX 가 죽는다.
+  // 라디오 해제는 Arduino 가 관리하도록 WiFi.mode(OFF) 만 사용.
   WiFi.mode(WIFI_OFF);
+  delay(50);
 }
 
 // ── OLED ──────────────────────────────────────────────────────
 static void oledDraw() {
   display.clearBuffer();
   display.setFont(u8g2_font_5x7_tf);
-  int y = 8;
-  // line1: 모드 / 연결 상태
-  const char* l1 = "ESPNOW";
-  if (g_mode == MODE_BLE) l1 = g_connected ? "BLE:CONN" : "BLE:ADV";
-  display.drawStr(0, y, l1);                                   y += 9;
-  // line2: ID
-  display.drawStr(0, y, g_id.c_str());                         y += 9;
-  // line3: 좌석
-  String s = "S:" + (g_seat.length() ? g_seat : String("-"));
-  display.drawStr(0, y, s.c_str());                            y += 9;
-  // line4: RGB 색 + 마지막 LED 코드
-  char ll[20];
-  snprintf(ll, sizeof(ll), "%s C:%s",
-           (g_last_led == 0xFF) ? "L:--" : (String("L:") + String(g_last_led, HEX)).c_str(),
-           rgbCommandName(g_last_rgb));
-  display.drawStr(0, y, ll);
+  char l[24];
+  // L1: 모드/실제 BLE 연결 상태 + 부팅횟수(리셋 감지). BLE:CONN = 서버가 진짜 붙은 것.
+  const char* m = "ESPNOW";
+  if (g_mode == MODE_BLE) m = g_connected ? "BLE:CONN" : "BLE:ADV";
+  snprintf(l, sizeof(l), "%s b#%lu", m, (unsigned long)g_bootCount);
+  display.drawStr(0, 7, l);
+  // L2: 팔찌 ID
+  display.drawStr(0, 15, g_id.c_str());
+  // L3: 마지막 이벤트(무슨 일이 있었나)
+  snprintf(l, sizeof(l), "ev:%s", g_lastEvent.c_str());
+  display.drawStr(0, 23, l);
+  // L4: 임베딩 보유 여부 + 좌석 (입장 '미발급' 디버깅용)
+  snprintf(l, sizeof(l), "emb:%s S:%s", g_hasEmb ? "Y" : "N",
+           g_seat.length() ? g_seat.c_str() : "-");
+  display.drawStr(0, 31, l);
+  // L5: 마지막 LED 효과 코드 + 현재 RGB 색
+  char ledbuf[6];
+  if (g_last_led == 0xFF) strcpy(ledbuf, "--");
+  else snprintf(ledbuf, sizeof(ledbuf), "%02X", g_last_led);
+  snprintf(l, sizeof(l), "L:%s R:%s", ledbuf, rgbCommandName(g_last_rgb));
+  display.drawStr(0, 39, l);
   display.sendBuffer();
 }
 
@@ -358,12 +378,14 @@ static void oledDraw() {
 class ServerCB : public NimBLEServerCallbacks {
   void onConnect(NimBLEServer* s, ble_gap_conn_desc* d) override {
     g_connected = true;
+    g_lastEvent = "BLE conn";
     Serial.println("[BLE] connected");
     digitalWrite(PIN_LED, LOW);
     oledDraw();
   }
   void onDisconnect(NimBLEServer* s) override {
     g_connected = false;
+    g_lastEvent = "BLE gone";
     Serial.println("[BLE] disconnected — ESP-NOW 모드로 복귀 예약");
     digitalWrite(PIN_LED, HIGH);
     // 광고를 재개하지 않고 ESP-NOW 모드로 빠져나간다. 실제 전환은 loop 에서.
@@ -380,6 +402,8 @@ class EmbedCB : public NimBLECharacteristicCallbacks {
     if (off >= EMBED_BYTES) return;
     if (off + dlen > EMBED_BYTES) dlen = EMBED_BYTES - off;
     memcpy(g_embedding + off, v.data() + 2, dlen);
+    g_hasEmb = true;
+    g_lastEvent = "EMB wr";
     Serial.printf("[BLE] embedding chunk off=%u len=%u\n", off, (unsigned)dlen);
   }
   void onRead(NimBLECharacteristic* c) override {
@@ -403,6 +427,7 @@ class EmbOffCB : public NimBLECharacteristicCallbacks {
 class SeatCB : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* c) override {
     g_seat = String(c->getValue().c_str());
+    g_lastEvent = "SEAT";
     Serial.printf("[BLE] seat write: %s\n", g_seat.c_str());
     oledDraw();
   }
@@ -413,6 +438,7 @@ class LedCB : public NimBLECharacteristicCallbacks {
     std::string v = c->getValue();
     if (v.empty()) return;
     g_last_led = (uint8_t)v[0];
+    g_lastEvent = "LED";
     Serial.printf("[BLE] LED effect: 0x%02X\n", g_last_led);
     // 온보드 LED 깜빡 (코드 하위 3비트 횟수)
     for (int i = 0; i < (g_last_led & 0x07); i++) {
@@ -441,6 +467,7 @@ class FlagCB : public NimBLECharacteristicCallbacks {
 class CtrlCB : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* c) override {
     (void)c;
+    g_lastEvent = "CTRL end";
     Serial.println("[BLE] CTRL write — ESP-NOW 모드로 복귀 예약");
     g_switchToEspnow = true;
   }
@@ -529,9 +556,23 @@ static void bleEnd() {
   g_connected = false;
 }
 
+// 부팅 시 자기 BLE 주소를 ST25DV 에 적어둔다(NFC 핸드오프용). BLE init 전이라도
+// esp_read_mac(ESP_MAC_BT) 로 광고에 쓰일 BT MAC 을 얻을 수 있다(=bleak 이 보는 주소).
+static void writeBleAddrToTag() {
+  uint8_t mac[6] = {0};
+  esp_read_mac(mac, ESP_MAC_BT);
+  uint8_t blk4[NFC_BLOCK_BYTES] = {mac[0], mac[1], mac[2], mac[3]};
+  uint8_t blk5[NFC_BLOCK_BYTES] = {mac[4], mac[5], 'F', 'A'};   // 뒤 2바이트 = magic
+  st25WriteBytes(NFC_ADDR_BYTE_ADDR, blk4, NFC_BLOCK_BYTES);
+  st25WriteBytes(NFC_ADDR_BYTE_ADDR + NFC_BLOCK_BYTES, blk5, NFC_BLOCK_BYTES);
+  Serial.printf("[ST25] BLE addr 저장 %02X:%02X:%02X:%02X:%02X:%02X\n",
+                mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
+
 // ── 모드 전환 (loop 에서만 호출) ──────────────────────────────
 static void enterBleMode() {
   Serial.println("[MODE] ESPNOW->BLE");
+  g_lastEvent = "NFC->BLE";
   espNowEnd();
   bleBegin();
   g_mode          = MODE_BLE;
@@ -552,6 +593,7 @@ static void enterEspnowMode() {
 void setup() {
   Serial.begin(115200);
   delay(200);
+  g_bootCount++;                  // 리셋/크래시마다 증가 — OLED b# 로 확인
 
   pinMode(PIN_LED, OUTPUT);
   digitalWrite(PIN_LED, HIGH);   // OFF (active-low)
@@ -578,6 +620,7 @@ void setup() {
 
   // ST25DV GPO: RF 쓰기 시 펄스 출력하도록 설정 (실패해도 부팅 계속)
   st25ConfigureGpo();
+  writeBleAddrToTag();   // BLE 주소 핸드오프 블록 기록
 
   // GPIO7 FALLING 인터럽트 — GPO 펄스 감지
   pinMode(PIN_GPO, INPUT_PULLUP);
@@ -670,6 +713,7 @@ void loop() {
     portEXIT_CRITICAL(&rgbMux);
     if (hasRgb) {
       applyRgbCommand(rgb);   // 수동 명령 — applyRgbCommand 가 알림 타이머 해제
+      g_lastEvent = String("RGB ") + rgbCommandName(rgb);
       oledDraw();
       Serial.printf("OK ESPNOW RGB=%s\n", rgbCommandName(rgb));
     }

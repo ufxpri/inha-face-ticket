@@ -46,6 +46,10 @@ class SplitOperatorDevice(IOperatorDevice):
     def port(self) -> str | None:
         return self.nfc.port
 
+    @property
+    def last_wristband_addr(self) -> str | None:
+        return self.nfc.last_wristband_addr   # wake 는 NFC 역할로 라우팅됨
+
     def status_snapshot(self) -> dict:
         return {
             ROLE_NFC:  {"connected": self.nfc.is_connected,  "port": self.nfc.port},

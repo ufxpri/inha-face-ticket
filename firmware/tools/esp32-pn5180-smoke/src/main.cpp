@@ -33,9 +33,11 @@ static U8G2_SSD1306_72X40_ER_F_HW_I2C oled(U8G2_R0, U8X8_PIN_NONE, OLED_SCL, OLE
 
 // 리셋/크래시 감지용 부팅 카운터 — RTC 메모리라 소프트리셋/크래시엔 유지(완전 정전엔 0).
 RTC_DATA_ATTR static uint32_t g_bootCount = 0;
-static String g_lastCmd    = "-";
-static String g_lastResult = "-";
-static uint32_t g_lastCmdAt = 0;
+static String   g_lastCmd    = "-";
+static String   g_lastResult = "-";
+static uint32_t g_rxCount    = 0;        // 처리한 시리얼 명령 수 (서버가 실제로 말 거는지)
+static bool     g_pnOk       = false;    // PN5180 레지스터 응답 여부 (리더 생존)
+static char     g_tagHex[8]  = "--";     // 마지막 감지 태그 UID 앞 2바이트
 
 static const uint8_t PIN_NFC_NSS = 10;
 static const uint8_t PIN_NFC_MOSI = 7;
@@ -45,6 +47,7 @@ static const uint8_t PIN_NFC_BUSY = 20;
 static const uint8_t PIN_NFC_RST = 21;
 
 static const uint8_t NFC_TRIGGER_BLOCK = 8;
+static const uint8_t NFC_ADDR_BLOCK = 4;   // 팔찌가 적어둔 BLE 주소(block4-5) 핸드오프
 static const uint8_t NFC_BLOCK_BYTES = 4;
 static const uint16_t NFC_TIMEOUT_MS = 900;
 static const uint8_t NFC_WAKE_PAYLOAD[NFC_BLOCK_BYTES] = {'F', 'T', 'W', 'K'};
@@ -118,19 +121,20 @@ static const char* rgbCommandName(RgbCommand command) {
 
 static void setResult(const String& r) { g_lastResult = r; }
 
-// 디버그 OLED 그리기 — 부팅횟수(리셋감지) / ESP-NOW 상태 / 가동시간·heap /
-// 마지막 명령 / 마지막 결과. 72x40 이라 5줄, 5x7 폰트.
+// 디버그 OLED 그리기 (72x40, 5줄). 의미있는 운영 정보만:
+//  L1 부팅횟수(리셋 감지) + 수신 명령 수(서버 링크 활성)
+//  L2 PN5180 생존(리더 응답) + ESP-NOW 송신 준비
+//  L3 마지막 감지 태그 UID (없으면 --)
+//  L4 마지막 명령 / L5 마지막 결과
 static void drawDebug() {
-  uint32_t up = millis() / 1000;
-  uint32_t heapK = ESP.getFreeHeap() / 1024;
   char l[24];
   oled.clearBuffer();
   oled.setFont(u8g2_font_5x7_tf);
-  snprintf(l, sizeof(l), "NFC  b#%lu", (unsigned long)g_bootCount);
+  snprintf(l, sizeof(l), "NFC b#%lu rx%lu", (unsigned long)g_bootCount, (unsigned long)g_rxCount);
   oled.drawStr(0, 7, l);
-  snprintf(l, sizeof(l), "EN:%s c%u", espnowReady ? "RDY" : "OFF", (unsigned)ESPNOW_CHANNEL);
+  snprintf(l, sizeof(l), "PN:%s EN:%s", g_pnOk ? "OK" : "XX", espnowReady ? "RDY" : "--");
   oled.drawStr(0, 15, l);
-  snprintf(l, sizeof(l), "up%lus h%luk", (unsigned long)up, (unsigned long)heapK);
+  snprintf(l, sizeof(l), "tag:%s", g_tagHex);
   oled.drawStr(0, 23, l);
   snprintf(l, sizeof(l), "C:%s", g_lastCmd.c_str());
   oled.drawStr(0, 31, l);
@@ -392,6 +396,7 @@ static bool nfcInventory(uint8_t uid[8]) {
   }
   if (responseLen < 10 || (response[0] & 0x01)) return false;
   memcpy(uid, response + 2, 8);
+  snprintf(g_tagHex, sizeof(g_tagHex), "%02X%02X", uid[0], uid[1]);
   return true;
 }
 
@@ -476,6 +481,39 @@ static NfcResult nfcWriteBlockWithVerify(const uint8_t payload[NFC_BLOCK_BYTES])
   return NFC_RESULT_OK;
 }
 
+// WAKE(트리거 write) + 같은 RF 세션에서 팔찌가 적어둔 BLE 주소(block4-5) read.
+// addrOut: "AABBCCDDEEFF" (magic 'F','A' 검증 실패/미존재 시 빈 문자열 → 서버가 스캔 폴백).
+static NfcResult nfcWakeAndReadAddr(char* addrOut) {
+  addrOut[0] = '\0';
+  uint8_t uid[8] = {0};
+  uint8_t verify[NFC_BLOCK_BYTES] = {0};
+
+  NfcResult started = nfcSessionBegin();
+  if (started != NFC_RESULT_OK) return started;
+  if (!nfcInventory(uid)) { nfcSessionEnd(); return NFC_RESULT_NO_TAG; }
+  if (!nfcWriteSingleBlock(uid, NFC_TRIGGER_BLOCK, NFC_WAKE_PAYLOAD)) {
+    nfcSessionEnd();
+    return NFC_RESULT_WRITE_FAILED;
+  }
+  delay(20);
+  if (!nfcReadSingleBlock(uid, NFC_TRIGGER_BLOCK, verify) ||
+      memcmp(verify, NFC_WAKE_PAYLOAD, NFC_BLOCK_BYTES) != 0) {
+    nfcSessionEnd();
+    return NFC_RESULT_VERIFY_FAILED;
+  }
+  // 주소 핸드오프 블록 read (실패해도 wake 는 성공 처리 — 서버가 스캔으로 폴백)
+  uint8_t b4[NFC_BLOCK_BYTES] = {0};
+  uint8_t b5[NFC_BLOCK_BYTES] = {0};
+  if (nfcReadSingleBlock(uid, NFC_ADDR_BLOCK, b4) &&
+      nfcReadSingleBlock(uid, NFC_ADDR_BLOCK + 1, b5) &&
+      b5[2] == 'F' && b5[3] == 'A') {
+    snprintf(addrOut, 18, "%02X%02X%02X%02X%02X%02X",
+             b4[0], b4[1], b4[2], b4[3], b5[0], b5[1]);
+  }
+  nfcSessionEnd();
+  return NFC_RESULT_OK;
+}
+
 static void printResult(NfcResult result, const char* writeFailure) {
   if (result == NFC_RESULT_OK) {
     Serial.println("OK"); setResult("OK");
@@ -496,7 +534,7 @@ static void handleCommand(String cmd) {
   cmd.trim();
   cmd.toUpperCase();
   g_lastCmd = cmd;
-  g_lastCmdAt = millis();
+  g_rxCount++;
   if (cmd == "PING") {
     Serial.println("OK PONG"); setResult("PONG");
   } else if (cmd == "STATUS") {
@@ -524,7 +562,14 @@ static void handleCommand(String cmd) {
       printResult(result, "NFC_INVENTORY_FAILED");
     }
   } else if (cmd == "WAKE") {
-    printResult(nfcWriteBlockWithVerify(NFC_WAKE_PAYLOAD), "NFC_WAKE_FAILED");
+    char addr[18] = {0};
+    NfcResult r = nfcWakeAndReadAddr(addr);
+    if (r == NFC_RESULT_OK) {
+      if (addr[0]) { Serial.printf("OK ADDR=%s\n", addr); setResult("OK+adr"); }
+      else { Serial.println("OK"); setResult("OK"); }
+    } else {
+      printResult(r, "NFC_WAKE_FAILED");
+    }
   } else if (cmd == "CLEAR") {
     printResult(nfcWriteBlockWithVerify(NFC_CLEAR_PAYLOAD), "NFC_CLEAR_FAILED");
   } else if (cmd == "PASS") {
@@ -558,8 +603,10 @@ void setup() {
   Serial.begin(115200);
   delay(300);
   g_bootCount++;                       // 리셋/크래시마다 증가 — OLED 에서 확인
-  Wire.begin(OLED_SDA, OLED_SCL);
+  // 팔찌와 동일 시퀀스: begin() 이 I2C(생성자 SCL=6/SDA=5)까지 초기화하므로
+  // 사전 Wire.begin 불필요. 0.42" ER 패널은 setContrast 안 올리면 화면이 안 보임.
   oled.begin();
+  oled.setContrast(255);
   oled.setFont(u8g2_font_5x7_tf);
   drawDebug();                         // 부팅 직후 1차 표시 (EN:OFF)
   nfcBegin();
@@ -583,10 +630,12 @@ void loop() {
     }
   }
 
-  // 주기 갱신 — 가동시간/heap 이 계속 올라가면 정상, 0 으로 떨어지면 리셋된 것.
+  // 주기 갱신 — PN5180 생존(SPI 레지스터 읽기, RF 미사용)을 확인하고 OLED 갱신.
   static uint32_t lastDraw = 0;
   if (millis() - lastDraw > 1000) {
     lastDraw = millis();
+    uint32_t v = 0;
+    g_pnOk = pn5180ReadRegister(REG_IRQ_STATUS, &v);
     drawDebug();
   }
 

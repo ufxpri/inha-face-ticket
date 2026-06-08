@@ -58,6 +58,11 @@ def msg_flags(snapshot: dict) -> dict:
     return {"type": "flags", **snapshot}
 
 
+def msg_sound(kind: str) -> dict:
+    """태블릿에서 효과음 재생 트리거 (예: NFC 태그 인식 'tag')."""
+    return {"type": "sound", "kind": kind}
+
+
 # ── inbound 정규화 ───────────────────────────────────────────
 
 

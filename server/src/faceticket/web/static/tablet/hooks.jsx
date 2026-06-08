@@ -149,6 +149,8 @@ function useTabletViewState() {
       const m = JSON.parse(ev.data);
       if (m.type === 'hello') {
         if (typeof m.cosine_threshold === 'number') setCosineThreshold(m.cosine_threshold);
+      } else if (m.type === 'sound') {
+        _snd(m.kind || 'tag');   // 서버 이벤트로 효과음 (예: NFC 태그 인식 '삑')
       } else if (m.type === 'capture_trigger') {
         const flow = m.mode === 'entry' ? 'entry' : 'issue';
         lastFlowRef.current = flow;

@@ -37,8 +37,9 @@ class ReturnFlow(FlowBase):
         await self.presenter.emit_log("팔찌를 NFC 리더에 대주세요 — wake 대기 중 (최대 15초)")
         if not await dev.wake_wristband_wait():
             return ReturnOutcome(False, reason="wake 실패")
+        await self.presenter.emit_sound("tag")   # NFC 태그 인식 — 태블릿 '삑'
 
-        async with self.ble_session() as connected:
+        async with self.ble_session(address=dev.last_wristband_addr) as connected:
             if not connected:
                 return ReturnOutcome(False, reason="BLE 연결 실패")
             wid = await self.ble.read_wristband_id()
